@@ -1,10 +1,10 @@
 use crate::downloader_trait::Downloader;
-use crate::utils::utils::{fix_thumbnail_url, get_text_from_object};
+use crate::utils::utils::get_text_from_object;
 use crate::youtube_extractor::error::ParsingError;
 use crate::youtube_extractor::stream_extractor::{Thumbnail, HARDCODED_CLIENT_VERSION};
 use crate::youtube_extractor::stream_info_item_extractor::YTStreamInfoItemExtractor;
 use futures::try_join;
-use serde_json::{Map, Value};
+use serde_json::Value;
 use std::collections::HashMap;
 
 pub static CHANNEL_URL_BASE: &str = "https://www.youtube.com/channel/";
@@ -17,9 +17,7 @@ pub struct YTChannelExtractor {
 }
 
 impl YTChannelExtractor {
-    async fn get_initial_data<D: Downloader>(
-        id: &str,
-    ) -> Result<Value, ParsingError> {
+    async fn get_initial_data<D: Downloader>(id: &str) -> Result<Value, ParsingError> {
         let mut url = format!("{}{}/videos?pbj=1&view=0&flow=grid", CHANNEL_URL_BASE, id);
 
         let mut level = 0;
@@ -143,7 +141,6 @@ impl YTChannelExtractor {
         if let Some(page_url) = page_url {
             let initial_data = YTChannelExtractor::get_initial_data::<D>(channel_id);
             let page = YTChannelExtractor::get_page::<D>(&page_url);
-            use futures::try_join;
             let (initial_data, page) = try_join!(initial_data, page)?;
             let video_tab = YTChannelExtractor::get_video_tab(&initial_data)?;
 
@@ -153,8 +150,7 @@ impl YTChannelExtractor {
                 page: Some(page),
             })
         } else {
-            let initial_data =
-                YTChannelExtractor::get_initial_data::<D>(channel_id).await?;
+            let initial_data = YTChannelExtractor::get_initial_data::<D>(channel_id).await?;
             let video_tab = YTChannelExtractor::get_video_tab(&initial_data)?;
             Ok(YTChannelExtractor {
                 initial_data,
@@ -258,9 +254,7 @@ impl YTChannelExtractor {
             .as_array()
             .ok_or("thumbnails array")?
         {
-            // println!("{:#?}",thumb);
             if let Ok(thumb) = serde_json::from_value(thumb.to_owned()) {
-                // thumb.url = fix_thumbnail_url(&thumb.url);
                 thumbnails.push(thumb)
             }
         }
@@ -281,9 +275,7 @@ impl YTChannelExtractor {
             .as_array()
             .ok_or("thumbnails array")?
         {
-            // println!("{:#?}",thumb);
             if let Ok(thumb) = serde_json::from_value(thumb.to_owned()) {
-                // thumb.url = fix_thumbnail_url(&thumb.url);
                 thumbnails.push(thumb)
             }
         }

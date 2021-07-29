@@ -1,4 +1,3 @@
-use failure::Error;
 use failure::Fail;
 use failure::_core::fmt::Debug;
 
@@ -33,13 +32,3 @@ impl From<String> for ParsingError {
         ParsingError::ParsingError { cause }
     }
 }
-
-// impl<D> From<D> for ParsingError
-//     where D:Debug
-// {
-//     fn from(debug_msg: D) -> Self {
-//         ParsingError::ParsingError {
-//             cause:format!("{:#?}",debug_msg)
-//         }
-//     }
-// }

@@ -10,7 +10,6 @@ pub fn remove_non_digit_chars<T: std::str::FromStr>(input: &str) -> Result<T, T:
 }
 
 pub fn mixed_number_word_parse(input: &str) -> Result<i32, ParsingError> {
-    // println!("input string to parse: {}",input);
     let re = regex::Regex::new(r##"[\d]+([\.,][\d]+)?([KMBkmb])+"##).expect("regex incrorrect");
     let mut multiplier = String::new();
     if let Some(cap) = re.captures(input) {
@@ -163,7 +162,7 @@ pub fn get_text_from_object(
     let mut text = String::new();
     if let Some(runs) = text_object.get("runs").and_then(|runs| runs.as_array()) {
         for text_part in runs {
-            let mut text_p = text_part
+            let text_p = text_part
                 .get("text")
                 .and_then(|p| p.as_str())
                 .unwrap_or("")

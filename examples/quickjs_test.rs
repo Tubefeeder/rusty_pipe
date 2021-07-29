@@ -1,5 +1,5 @@
 extern crate rusty_pipe;
-use quick_js::{Context, JsValue};
+use quick_js::Context;
 
 fn main() {
     let context = Context::new().unwrap();

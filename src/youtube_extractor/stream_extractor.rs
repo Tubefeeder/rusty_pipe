@@ -4,21 +4,15 @@ use serde_json::{Map, Value};
 use std::collections::HashMap;
 
 use super::super::utils::utils::*;
-use super::itag_item::{Itag, ItagType};
+use super::itag_item::ItagType;
 use crate::youtube_extractor::error::ParsingError;
 use crate::youtube_extractor::search_extractor::YTSearchItem;
-use failure::Error;
 use lazy_static::lazy_static;
-use std::future::Future;
-
-const CONTENT: &str = "content";
 
 const FORMATS: &str = "formats";
 const ADAPTIVE_FORMATS: &str = "adaptiveFormats";
 const HTTPS: &str = "https:";
 const DECRYPTION_FUNC_NAME: &str = "decrypt";
-
-const VERIFIED_URL_PARAMS: &str = "&has_verified=1&bpctr=9999999999";
 
 lazy_static! {
     static ref REGEXES: Vec<&'static str>=vec![
@@ -35,8 +29,6 @@ pub const HARDCODED_CLIENT_VERSION: &str = "2.20200214.04.00";
 #[derive(Clone, PartialEq)]
 pub struct YTStreamExtractor<D: Downloader> {
     doc: String,
-    // player_args: Map<String, Value>,
-    // video_info_page:Map<String,String>,
     player_response: Map<String, Value>,
     player_code: String,
     video_id: String,
@@ -44,27 +36,27 @@ pub struct YTStreamExtractor<D: Downloader> {
     initial_data: Value,
     primary_info_renderer: Value,
     secondary_info_renderer: Value,
-    // is_age_restricted:bool,
     downloader: D,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StreamItem {
     pub url: Option<String>,
     pub itag: u32,
-    pub approxDurationMs: Option<String>,
-    pub audioChannels: Option<u32>,
-    pub audioQuality: Option<String>,
-    pub audioSampleRate: Option<String>,
-    pub averageBitrate: Option<u32>,
+    pub approx_duration_ms: Option<String>,
+    pub audio_channels: Option<u32>,
+    pub audio_quality: Option<String>,
+    pub audio_sample_rate: Option<String>,
+    pub average_bitrate: Option<u32>,
     pub bitrate: u32,
-    pub contentLength: Option<String>,
+    pub content_length: Option<String>,
     pub height: Option<u32>,
     pub width: Option<u32>,
     pub quality: String,
-    pub qualityLabel: Option<String>,
-    pub lastModified: String,
-    pub mimeType: String,
+    pub quality_label: Option<String>,
+    pub last_modified: String,
+    pub mime_type: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -99,13 +91,12 @@ impl<D: Downloader> YTStreamExtractor<D> {
         let secondary_info_renderer =
             YTStreamExtractor::<D>::get_secondary_info_renderer(&initial_data)?;
         if let Some(response) = initial_response {
-
-            if Self::is_decryption_needed(&response).unwrap_or(false){
+            if Self::is_decryption_needed(&response).unwrap_or(false) {
                 let player_url = Self::get_player_js_url(video_id, &downloader).await?;
                 let player_code =
-                YTStreamExtractor::<D>::get_player_code(&player_url, &downloader).await?;
+                    YTStreamExtractor::<D>::get_player_code(&player_url, &downloader).await?;
                 Ok(YTStreamExtractor {
-                    player_response:response,
+                    player_response: response,
                     downloader,
                     player_code,
                     initial_data,
@@ -114,8 +105,7 @@ impl<D: Downloader> YTStreamExtractor<D> {
                     doc: String::from(doc),
                     video_id: String::from(video_id),
                 })
-            }else{
-
+            } else {
                 Ok(YTStreamExtractor {
                     player_response: response,
                     downloader,
@@ -127,21 +117,16 @@ impl<D: Downloader> YTStreamExtractor<D> {
                     video_id: String::from(video_id),
                 })
             }
-            
         } else {
-
             // OLD METHOD
             let player_config = YTStreamExtractor::<D>::get_player_config(&doc)
                 .ok_or("cannot get player_config".to_string())?;
-            // println!("player config : {:?}",player_config);
 
             let player_args = YTStreamExtractor::<D>::get_player_args(&player_config)
                 .ok_or("cannot get player args".to_string())?;
-            // println!("player args : {:?} ",player_args);
 
             let player_response = YTStreamExtractor::<D>::get_player_response(&player_args)
                 .ok_or("cannot get player response".to_string())?;
-            // println!("player response {:?}", player_response);
             let player_url = YTStreamExtractor::<D>::get_player_url(&player_config)
                 .ok_or("Cant get player url".to_owned())?;
             let player_code =
@@ -159,27 +144,22 @@ impl<D: Downloader> YTStreamExtractor<D> {
         }
     }
 
-    
-
     fn is_decryption_needed(player_response: &Map<String, Value>) -> Result<bool, ParsingError> {
         let streaming_data = player_response.get("streamingData").unwrap_or(&Value::Null);
         if let Value::Object(streaming_data) = streaming_data {
             if let Value::Array(formats) = streaming_data.get(FORMATS).unwrap_or(&Value::Null) {
                 if let Some(format_data) = formats.first() {
                     match format_data.get("url").unwrap_or(&Value::Null) {
-                        Value::String(url) => Ok(false),
+                        Value::String(_url) => Ok(false),
                         _ => Ok(true),
                     }
                 } else {
                     Ok(false)
                 }
-
-            // println!("all formats {:#?}",formats);
             } else {
                 Ok(false)
             }
         } else {
-            
             Err(ParsingError::ParsingError {
                 cause: "Streaming data not found in player response".to_string(),
             })
@@ -199,10 +179,8 @@ impl<D: Downloader> YTStreamExtractor<D> {
                 .get(streaming_data_key)
                 .unwrap_or(&Value::Null)
             {
-                // println!("all formats {:#?}",formats);
                 for format_data in formats {
                     if let Value::Object(format_data_obj) = format_data {
-                        // println!("format data {:#?}",format_data);
                         let stream_url = match format_data_obj.get("url").unwrap_or(&Value::Null) {
                             Value::String(url) => String::from(url),
                             _ => {
@@ -232,7 +210,7 @@ impl<D: Downloader> YTStreamExtractor<D> {
                         match serde_json::from_value::<StreamItem>(format_data.clone()) {
                             Ok(stream_item) => match itag_type_wanted {
                                 ItagType::VideoOnly => {
-                                    if stream_item.audioQuality.is_none() {
+                                    if stream_item.audio_quality.is_none() {
                                         url_and_itags.insert(stream_url, stream_item);
                                     }
                                 }
@@ -245,15 +223,8 @@ impl<D: Downloader> YTStreamExtractor<D> {
                                     url_and_itags.insert(stream_url, stream_item);
                                 }
                             },
-                            Err(err) => {
-                                // return Err(ParsingError::ParsingError {
-                                //     cause: err.to_string(),
-                                // })
-                            }
+                            Err(_) => {}
                         }
-                    // url_and_itags.insert(stream_url, itag_item);
-                    } else {
-                        // println!("itag {} rejected",itag);
                     }
                 }
             } else {
@@ -268,9 +239,10 @@ impl<D: Downloader> YTStreamExtractor<D> {
         Ok(url_and_itags)
     }
 
-    // pub fn get_video_streams()
-
-    pub async fn get_player_code(player_url: &str, downloader: &D) -> Result<String, ParsingError> {
+    pub async fn get_player_code(
+        player_url: &str,
+        _downloader: &D,
+    ) -> Result<String, ParsingError> {
         let player_url = {
             if player_url.starts_with("http://") || player_url.starts_with("https://") {
                 player_url.to_string()
@@ -314,11 +286,11 @@ impl<D: Downloader> YTStreamExtractor<D> {
         None
     }
 
-    fn fix_player_url(url: &str)->String{
+    fn fix_player_url(url: &str) -> String {
         let mut player_url = url.to_string();
         if player_url.starts_with("//") {
             player_url = HTTPS.to_owned() + &player_url;
-        } else if player_url.starts_with("/"){
+        } else if player_url.starts_with("/") {
             player_url = HTTPS.to_owned() + "//www.youtube.com" + &player_url;
         }
         player_url.to_string()
@@ -348,7 +320,7 @@ impl<D: Downloader> YTStreamExtractor<D> {
         Some(player_response.as_object()?.to_owned())
     }
 
-    async fn get_initial_ajax_json(url: &str, downloader: &D) -> Result<Value, ParsingError> {
+    async fn get_initial_ajax_json(url: &str, _downloader: &D) -> Result<Value, ParsingError> {
         let mut headers = HashMap::new();
         headers.insert("X-YouTube-Client-Name".to_string(), "1".to_string());
         headers.insert(
@@ -361,9 +333,8 @@ impl<D: Downloader> YTStreamExtractor<D> {
         Ok(initial_ajax_json)
     }
 
-
-    async fn get_player_js_url(video_id: &str, downloader: &D) ->Result<String, ParsingError>{
-        let embed_url = format!("https://www.youtube.com/embed/{}",video_id);
+    async fn get_player_js_url(video_id: &str, _downloader: &D) -> Result<String, ParsingError> {
+        let embed_url = format!("https://www.youtube.com/embed/{}", video_id);
         let mut headers = HashMap::new();
         headers.insert("X-YouTube-Client-Name".to_string(), "1".to_string());
         headers.insert(
@@ -381,9 +352,9 @@ impl<D: Downloader> YTStreamExtractor<D> {
             }
             Err(_) => {
                 let srcreg = r###"script.*src\s*="(.*)"\s*.*name\s*=\s*"player_ias\/base""###;
-                let url =Self::match_group1(srcreg, &data);
-                let url = url.and_then(|url|Ok(Self::fix_player_url(&url)));
-                log::debug!("Player url {:#?}",url);
+                let url = Self::match_group1(srcreg, &data);
+                let url = url.and_then(|url| Ok(Self::fix_player_url(&url)));
+                log::debug!("Player url {:#?}", url);
                 url
             }
         }
@@ -424,7 +395,6 @@ impl<D: Downloader> YTStreamExtractor<D> {
                 cause: "initial ajax doesnt have index 2".to_string(),
             })
         }
-        // println!("{:#?}",data)
     }
 
     fn get_primary_info_renderer(inital_data: &Value) -> Result<Value, ParsingError> {
@@ -476,7 +446,6 @@ impl<D: Downloader> YTStreamExtractor<D> {
                 "Cant find decryption function",
             ))?;
 
-        // println!("Decryption func name {}", decryption_func_name);
         let function_pattern = format!(
             "({}=function\\([a-zA-Z0-9_]+\\)\\{{.+?\\}})",
             decryption_func_name.replace("$", "\\$")
@@ -492,7 +461,6 @@ impl<D: Downloader> YTStreamExtractor<D> {
             &decryption_func,
         )?;
 
-        // print!("helper object name : {}",helper_object_name);
         let helper_pattern = format!(
             "(var {}=\\{{.+?\\}}\\}};)",
             helper_object_name.replace("$", "\\$")
@@ -513,8 +481,6 @@ impl<D: Downloader> YTStreamExtractor<D> {
     }
 
     fn get_decryption_func_name(player_code: &str) -> Option<String> {
-        // let decryption_func_name_regexes = REGEXES;
-        // use fancy_regex::Regex;
         for reg in REGEXES.iter() {
             let rege = fancy_regex::Regex::new(reg).ok()?;
             let capture = rege.captures(player_code).unwrap();
@@ -673,7 +639,6 @@ impl<D: Downloader> YTStreamExtractor<D> {
                 }
             }
         }
-        // println!("{}",views);
         Err(ParsingError::parsing_error_from_str("Cant get view count"))
     }
 
@@ -829,18 +794,6 @@ impl<D: Downloader> YTStreamExtractor<D> {
         }
         Ok(thumbnails)
     }
-
-    // pub fn is_live(&self)->Result<bool,String>{
-    //     if let Some(format) = self.player_response.get("streamingData").and_then(|f|f.get(FORMATS)){
-    //         return Ok(true);
-    //     }else if let Some(ps)= self.player_args.get("ps").and_then(|f|f.as_str()){
-    //         println!("{}",ps);
-    //         if ps=="live"{
-    //             return Ok(true)
-    //         }
-    //     }
-    //     Ok(false)
-    // }
 }
 
 impl<D: Downloader> YTStreamExtractor<D> {

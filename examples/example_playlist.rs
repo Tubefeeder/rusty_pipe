@@ -1,20 +1,14 @@
 extern crate rusty_pipe;
 
-use rusty_pipe::youtube_extractor::search_extractor::*;
-use std::io;
-
 use rusty_pipe::downloader_trait::Downloader;
 use std::collections::HashMap;
 use std::str::FromStr;
-use urlencoding::encode;
 
 use async_trait::async_trait;
 use failure::Error;
-use rusty_pipe::youtube_extractor::channel_extractor::YTChannelExtractor;
 use rusty_pipe::youtube_extractor::error::ParsingError;
 use rusty_pipe::youtube_extractor::playlist_extractor::YTPlaylistExtractor;
 use rusty_pipe::youtube_extractor::stream_info_item_extractor::YTStreamInfoItemExtractor;
-use serde_json::Value;
 
 struct DownloaderExample;
 
@@ -58,7 +52,7 @@ impl Downloader for DownloaderExample {
     }
 
     fn eval_js(script: &str) -> Result<String, String> {
-        use quick_js::{Context, JsValue};
+        use quick_js::Context;
         let context = Context::new().expect("Cant create js context");
         // println!("decryption code \n{}",decryption_code);
         // println!("signature : {}",encrypted_sig);

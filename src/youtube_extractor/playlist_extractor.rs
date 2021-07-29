@@ -47,7 +47,7 @@ impl YTPlaylistExtractor {
 
     async fn get_initial_data<D: Downloader>(
         id: &str,
-        downloader: &D,
+        _downloader: &D,
     ) -> Result<Value, ParsingError> {
         let url = format!("https://www.youtube.com/playlist?list={}&pbj=1", id);
         let mut headers = HashMap::new();
@@ -114,7 +114,7 @@ impl YTPlaylistExtractor {
 
     async fn get_page<D: Downloader>(
         page_url: &str,
-        downloader: &D,
+        _downloader: &D,
     ) -> Result<(Vec<YTStreamInfoItemExtractor>, Option<String>), ParsingError> {
         let mut headers = HashMap::new();
         headers.insert("X-YouTube-Client-Name".to_string(), "1".to_string());
@@ -193,9 +193,7 @@ impl YTPlaylistExtractor {
         })())
         .ok_or("Cant get thumbnails")?
         {
-            // println!("{:#?}",thumb);
             if let Ok(thumb) = serde_json::from_value(thumb.to_owned()) {
-                // thumb.url = fix_thumbnail_url(&thumb.url);
                 thumbnails.push(thumb)
             }
         }
@@ -245,9 +243,7 @@ impl YTPlaylistExtractor {
         for thumb in (|| uploader.get("thumbnail")?.get("thumbnails")?.as_array())()
             .ok_or("Cant get uploaader thumbnails")?
         {
-            // println!("{:#?}",thumb);
             if let Ok(thumb) = serde_json::from_value(thumb.to_owned()) {
-                // thumb.url = fix_thumbnail_url(&thumb.url);
                 thumbnails.push(thumb)
             }
         }

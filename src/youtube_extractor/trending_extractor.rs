@@ -11,7 +11,7 @@ pub struct YTTrendingExtractor {
 }
 
 impl YTTrendingExtractor {
-    async fn get_initial_data<D: Downloader>(downloader: &D) -> Result<Value, ParsingError> {
+    async fn get_initial_data<D: Downloader>(_downloader: &D) -> Result<Value, ParsingError> {
         let url = format!("https://www.youtube.com/feed/trending?pbj=1");
         let mut headers = HashMap::new();
         headers.insert("X-YouTube-Client-Name".to_string(), "1".to_string());
@@ -67,11 +67,11 @@ impl YTTrendingExtractor {
             })();
             if let Some(shelf_content) = shelf_content {
                 for ul in shelf_content {
-                    if let Some(videoRenderer) =
+                    if let Some(video_renderer) =
                         ul.get("videoRenderer").unwrap_or(&Value::Null).as_object()
                     {
                         videos.push(YTStreamInfoItemExtractor {
-                            video_info: videoRenderer.clone(),
+                            video_info: video_renderer.clone(),
                         })
                     }
                 }

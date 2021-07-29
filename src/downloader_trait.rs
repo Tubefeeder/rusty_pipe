@@ -1,6 +1,5 @@
 use crate::youtube_extractor::error::ParsingError;
 use async_trait::async_trait;
-use failure::Error;
 use std::collections::HashMap;
 
 #[cfg(target_arch = "wasm32")]

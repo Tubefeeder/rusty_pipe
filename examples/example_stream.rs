@@ -1,30 +1,20 @@
 extern crate rusty_pipe;
 
 use rusty_pipe::downloader_trait::Downloader;
-use rusty_pipe::youtube_extractor::search_extractor::*;
 use rusty_pipe::youtube_extractor::stream_extractor::*;
-use std::io;
 
 use async_trait::async_trait;
 use rusty_pipe::youtube_extractor::error::ParsingError;
-use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
 use std::str::FromStr;
-use urlencoding::encode;
 
 #[tokio::main]
 async fn main() -> Result<(), failure::Error> {
     pretty_env_logger::init();
-    static APP_USER_AGENT: &str =
-        "Mozilla/5.0 (X11; Linux x86_64; rv:68.0) Gecko/20100101 Firefox/43.0";
-
-    // let url = "https://www.youtube.com/watch?v=09R8_2nJtjg&disable_polymer=1";
-    // let resp = reqwest::get(url).await.map_err(|er|er.to_string())?;
 
     let downloader = DownloaderExample {};
-    // let body = D::download(url).await?;
 
-    let mut stream_extractor = YTStreamExtractor::new("09R8_2nJtjg", downloader).await?;
+    let stream_extractor = YTStreamExtractor::new("09R8_2nJtjg", downloader).await?;
     let video_streams = stream_extractor.get_video_stream()?;
     println!("AUDIO/VIDEO STREAMS \n");
     println!("{:#?}", video_streams);
@@ -57,7 +47,6 @@ async fn main() -> Result<(), failure::Error> {
         "uploader thumbnails:\n {:#?}",
         stream_extractor.get_uploader_avatar_url()
     );
-    // println!("is live : {:#?}",stream_extractor.is_live());
     Ok(())
 }
 
@@ -103,13 +92,10 @@ impl Downloader for DownloaderExample {
     }
 
     fn eval_js(script: &str) -> Result<String, String> {
-        use quick_js::{Context, JsValue};
+        use quick_js::Context;
         let context = Context::new().expect("Cant create js context");
-        // println!("decryption code \n{}",decryption_code);
-        // println!("signature : {}",encrypted_sig);
         println!("jscode \n{}", script);
         let res = context.eval(script).unwrap_or(quick_js::JsValue::Null);
-        // println!("js result : {:?}", result);
         let result = res.into_string().unwrap_or("".to_string());
         print!("JS result: {}", result);
         Ok(result)

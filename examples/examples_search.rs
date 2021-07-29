@@ -22,7 +22,7 @@ async fn main() -> Result<(), Error> {
 
     search_query = encode(&search_query);
 
-    let search_extractor = YTSearchExtractor::new::<DownloaderExample>( &search_query, None).await?;
+    let search_extractor = YTSearchExtractor::new::<DownloaderExample>(&search_query, None).await?;
     let search_suggestion =
         YTSearchExtractor::get_search_suggestion::<DownloaderExample>(&search_query).await?;
 
@@ -37,7 +37,7 @@ async fn main() -> Result<(), Error> {
             break;
         }
         let search_extractor =
-            YTSearchExtractor::new::<DownloaderExample>( &search_query, Some(url)).await?;
+            YTSearchExtractor::new::<DownloaderExample>(&search_query, Some(url)).await?;
         items.append(&mut search_extractor.search_results()?);
         next_url = search_extractor.get_next_page_url()?;
         println!("Next page url : {:#?}", next_url);
@@ -187,7 +187,7 @@ impl Downloader for DownloaderExample {
     }
 
     fn eval_js(script: &str) -> Result<String, String> {
-        use quick_js::{Context, JsValue};
+        use quick_js::Context;
         let context = Context::new().expect("Cant create js context");
         // println!("decryption code \n{}",decryption_code);
         // println!("signature : {}",encrypted_sig);

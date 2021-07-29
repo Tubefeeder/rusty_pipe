@@ -1,19 +1,14 @@
 extern crate rusty_pipe;
 
-use rusty_pipe::youtube_extractor::search_extractor::*;
-use std::io;
-
 use rusty_pipe::downloader_trait::Downloader;
 use std::collections::HashMap;
 use std::str::FromStr;
-use urlencoding::encode;
 
 use async_trait::async_trait;
 use failure::Error;
 use rusty_pipe::youtube_extractor::channel_extractor::YTChannelExtractor;
 use rusty_pipe::youtube_extractor::error::ParsingError;
 use rusty_pipe::youtube_extractor::stream_info_item_extractor::YTStreamInfoItemExtractor;
-use serde_json::Value;
 
 struct DownloaderExample;
 
@@ -57,7 +52,7 @@ impl Downloader for DownloaderExample {
     }
 
     fn eval_js(script: &str) -> Result<String, String> {
-        use quick_js::{Context, JsValue};
+        use quick_js::Context;
         let context = Context::new().expect("Cant create js context");
         // println!("decryption code \n{}",decryption_code);
         // println!("signature : {}",encrypted_sig);
@@ -87,7 +82,7 @@ async fn main() -> Result<(), Error> {
         .read_line(&mut channel_id)
         .expect("Input failed");
     channel_id = channel_id.trim().to_string();
-    let channel_extractor = YTChannelExtractor::new::<DownloaderExample>(&channel_id,  None).await?;
+    let channel_extractor = YTChannelExtractor::new::<DownloaderExample>(&channel_id, None).await?;
     println!("Channel name {:#?}", channel_extractor.get_name());
     println!(
         "Channel Thumbnails \n{:#?}",
@@ -107,7 +102,7 @@ async fn main() -> Result<(), Error> {
 
     while let Some(next_page) = next_page_url.clone() {
         let extractor =
-            YTChannelExtractor::new::<DownloaderExample>(&channel_id,  Some(next_page)).await?;
+            YTChannelExtractor::new::<DownloaderExample>(&channel_id, Some(next_page)).await?;
         // print_videos(extractor.get_videos()?);
         next_page_url = extractor.get_next_page_url()?;
         videos.append(&mut channel_extractor.get_videos()?);

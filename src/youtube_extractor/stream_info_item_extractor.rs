@@ -2,7 +2,6 @@ use crate::utils::utils::*;
 use crate::youtube_extractor::error::ParsingError;
 use crate::youtube_extractor::stream_extractor::Thumbnail;
 use serde_json::{Map, Value};
-use std::convert::TryInto;
 
 #[derive(Clone, PartialEq)]
 pub struct YTStreamInfoItemExtractor {
@@ -318,7 +317,6 @@ impl YTStreamInfoItemExtractor {
             .as_array()
             .ok_or("thumbnails array")?
         {
-            // println!("{:#?}",thumb);
             if let Ok(thumb) = serde_json::from_value(thumb.to_owned()) {
                 thumbnails.push(thumb)
             }
@@ -341,7 +339,6 @@ impl YTStreamInfoItemExtractor {
             .as_array()
             .ok_or("thumbnails array")?
         {
-            // println!("{:#?}",thumb);
             if let Ok(thumb) = serde_json::from_value(thumb.to_owned()) {
                 thumbnails.push(thumb)
             }

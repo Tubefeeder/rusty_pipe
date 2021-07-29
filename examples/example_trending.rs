@@ -51,7 +51,7 @@ impl Downloader for DownloaderExample {
     }
 
     fn eval_js(script: &str) -> Result<String, String> {
-        use quick_js::{Context, JsValue};
+        use quick_js::Context;
         let context = Context::new().expect("Cant create js context");
         // println!("decryption code \n{}",decryption_code);
         // println!("signature : {}",encrypted_sig);
