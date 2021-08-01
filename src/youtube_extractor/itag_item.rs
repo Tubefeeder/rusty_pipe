@@ -346,7 +346,7 @@ impl Itag {
         false
     }
 
-    pub fn get_itag(id: i64) -> Result<Itag, String> {
+    pub fn itag(id: i64) -> Result<Itag, String> {
         for itag in ITAG_LIST.iter() {
             if itag.id == id {
                 return Ok(itag.clone());

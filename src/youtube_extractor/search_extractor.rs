@@ -27,7 +27,7 @@ pub struct YTSearchExtractor {
 }
 
 impl YTSearchExtractor {
-    async fn get_initial_data<D: Downloader>(
+    async fn initial_data<D: Downloader>(
         url: &str,
         page_count: &str,
     ) -> Result<Map<String, Value>, ParsingError> {
@@ -100,7 +100,7 @@ impl YTSearchExtractor {
         );
         let query = utf8_percent_encode(query, FRAGMENT).to_string();
         if let Some(page_url) = page_url {
-            let initial_data = YTSearchExtractor::get_initial_data::<D>(&url, &page_url).await?;
+            let initial_data = YTSearchExtractor::initial_data::<D>(&url, &page_url).await?;
 
             Ok(YTSearchExtractor {
                 initial_data,
@@ -109,7 +109,7 @@ impl YTSearchExtractor {
                 p_url: Some(page_url),
             })
         } else {
-            let initial_data = YTSearchExtractor::get_initial_data::<D>(&url, "1").await?;
+            let initial_data = YTSearchExtractor::initial_data::<D>(&url, "1").await?;
             Ok(YTSearchExtractor {
                 initial_data,
                 query,
@@ -119,7 +119,7 @@ impl YTSearchExtractor {
         }
     }
 
-    pub async fn get_search_suggestion<D: Downloader>(
+    pub async fn search_suggestion<D: Downloader>(
         query: &str,
     ) -> Result<Vec<String>, ParsingError> {
         let mut suggestions = vec![];
@@ -181,7 +181,7 @@ impl YTSearchExtractor {
         return Ok(search_items);
     }
 
-    pub fn get_next_page_url(&self) -> Result<Option<String>, ParsingError> {
+    pub fn next_page_url(&self) -> Result<Option<String>, ParsingError> {
         let pu = self
             .p_url
             .clone()

@@ -1,7 +1,5 @@
 use crate::downloader_trait::Downloader;
-use crate::utils::utils::{
-    get_text_from_object, get_url_from_navigation_endpoint, remove_non_digit_chars,
-};
+use crate::utils::utils::{remove_non_digit_chars, text_from_object, url_from_navigation_endpoint};
 use crate::youtube_extractor::error::ParsingError;
 use crate::youtube_extractor::stream_extractor::{Thumbnail, HARDCODED_CLIENT_VERSION};
 use crate::youtube_extractor::stream_info_item_extractor::YTStreamInfoItemExtractor;
@@ -22,11 +20,11 @@ impl YTPlaylistExtractor {
         page_url: Option<String>,
     ) -> Result<Self, ParsingError> {
         if let Some(page_url) = page_url {
-            let initial_data = YTPlaylistExtractor::get_initial_data(playlist_id, &downloader);
-            let page = YTPlaylistExtractor::get_page(&page_url, &downloader);
+            let initial_data = YTPlaylistExtractor::initial_data(playlist_id, &downloader);
+            let page = YTPlaylistExtractor::page(&page_url, &downloader);
             use futures::try_join;
             let (initial_data, page) = try_join!(initial_data, page)?;
-            let playlist_info = YTPlaylistExtractor::get_playlist_info(&initial_data)?;
+            let playlist_info = YTPlaylistExtractor::playlist_info(&initial_data)?;
 
             Ok(Self {
                 init_data: initial_data,
@@ -34,9 +32,8 @@ impl YTPlaylistExtractor {
                 page: Some(page),
             })
         } else {
-            let initial_data =
-                YTPlaylistExtractor::get_initial_data(playlist_id, &downloader).await?;
-            let playlist_info = YTPlaylistExtractor::get_playlist_info(&initial_data)?;
+            let initial_data = YTPlaylistExtractor::initial_data(playlist_id, &downloader).await?;
+            let playlist_info = YTPlaylistExtractor::playlist_info(&initial_data)?;
             Ok(Self {
                 init_data: initial_data,
                 playlist_info,
@@ -45,10 +42,7 @@ impl YTPlaylistExtractor {
         }
     }
 
-    async fn get_initial_data<D: Downloader>(
-        id: &str,
-        _downloader: &D,
-    ) -> Result<Value, ParsingError> {
+    async fn initial_data<D: Downloader>(id: &str, _downloader: &D) -> Result<Value, ParsingError> {
         let url = format!("https://www.youtube.com/playlist?list={}&pbj=1", id);
         let mut headers = HashMap::new();
         headers.insert("X-YouTube-Client-Name".to_string(), "1".to_string());
@@ -67,7 +61,7 @@ impl YTPlaylistExtractor {
         Ok(json_response.clone())
     }
 
-    fn get_playlist_info(initial_data: &Value) -> Result<Value, ParsingError> {
+    fn playlist_info(initial_data: &Value) -> Result<Value, ParsingError> {
         let pinfo = (|| {
             initial_data
                 .get("sidebar")?
@@ -100,7 +94,7 @@ impl YTPlaylistExtractor {
         Ok(streams)
     }
 
-    fn get_next_page_url_from(continuation: &Value) -> Option<String> {
+    fn next_page_url_from(continuation: &Value) -> Option<String> {
         let next_continuation_data = continuation.get(0)?.get("nextContinuationData")?;
         let continuation = next_continuation_data.get("continuation")?.as_str()?;
         let click_tracking_params = next_continuation_data
@@ -112,7 +106,7 @@ impl YTPlaylistExtractor {
         ))
     }
 
-    async fn get_page<D: Downloader>(
+    async fn page<D: Downloader>(
         page_url: &str,
         _downloader: &D,
     ) -> Result<(Vec<YTStreamInfoItemExtractor>, Option<String>), ParsingError> {
@@ -140,7 +134,7 @@ impl YTPlaylistExtractor {
                 .get("contents")
                 .ok_or("items not in continuation")?,
         )?;
-        let next_url = YTPlaylistExtractor::get_next_page_url_from(
+        let next_url = YTPlaylistExtractor::next_page_url_from(
             section_list_continuation
                 .get("continuations")
                 .unwrap_or(&Value::Null),
@@ -151,9 +145,9 @@ impl YTPlaylistExtractor {
 }
 
 impl YTPlaylistExtractor {
-    pub fn get_name(&self) -> Result<String, ParsingError> {
+    pub fn name(&self) -> Result<String, ParsingError> {
         if let Some(title) = self.playlist_info.get("title") {
-            let name = get_text_from_object(title, false)?;
+            let name = text_from_object(title, false)?;
             if let Some(name) = name {
                 if !name.is_empty() {
                     return Ok(name);
@@ -173,7 +167,7 @@ impl YTPlaylistExtractor {
         Err(ParsingError::from("Cant get name"))
     }
 
-    pub fn get_thumbnails(&self) -> Result<Vec<Thumbnail>, ParsingError> {
+    pub fn thumbnails(&self) -> Result<Vec<Thumbnail>, ParsingError> {
         let mut thumbnails = vec![];
         for thumb in (|| {
             self.playlist_info
@@ -200,7 +194,7 @@ impl YTPlaylistExtractor {
         Ok(thumbnails)
     }
 
-    fn get_uploader_info(&self) -> Result<Value, ParsingError> {
+    fn uploader_info(&self) -> Result<Value, ParsingError> {
         let items = (|| {
             self.init_data
                 .get("sidebar")?
@@ -222,24 +216,24 @@ impl YTPlaylistExtractor {
         Err(ParsingError::from("Cant get uploader info"))
     }
 
-    pub fn get_uploader_url(&self) -> Result<String, ParsingError> {
-        if let Some(navp) = self.get_uploader_info()?.get("navigationEndpoint") {
-            return Ok(get_url_from_navigation_endpoint(navp)?);
+    pub fn uploader_url(&self) -> Result<String, ParsingError> {
+        if let Some(navp) = self.uploader_info()?.get("navigationEndpoint") {
+            return Ok(url_from_navigation_endpoint(navp)?);
         } else {
             Err(ParsingError::from("Cant get uploader url"))
         }
     }
-    pub fn get_uploader_name(&self) -> Result<String, ParsingError> {
-        if let Some(navp) = self.get_uploader_info()?.get("title") {
-            return Ok(get_text_from_object(navp, false)?.ok_or("uploader name not found")?);
+    pub fn uploader_name(&self) -> Result<String, ParsingError> {
+        if let Some(navp) = self.uploader_info()?.get("title") {
+            return Ok(text_from_object(navp, false)?.ok_or("uploader name not found")?);
         } else {
             Err(ParsingError::from("Cant get uploader url"))
         }
     }
 
-    pub fn get_uploader_avatars(&self) -> Result<Vec<Thumbnail>, ParsingError> {
+    pub fn uploader_avatars(&self) -> Result<Vec<Thumbnail>, ParsingError> {
         let mut thumbnails = vec![];
-        let uploader = self.get_uploader_info()?;
+        let uploader = self.uploader_info()?;
         for thumb in (|| uploader.get("thumbnail")?.get("thumbnails")?.as_array())()
             .ok_or("Cant get uploaader thumbnails")?
         {
@@ -250,8 +244,8 @@ impl YTPlaylistExtractor {
         Ok(thumbnails)
     }
 
-    pub fn get_stream_count(&self) -> Result<i32, ParsingError> {
-        let views_text = get_text_from_object(
+    pub fn stream_count(&self) -> Result<i32, ParsingError> {
+        let views_text = text_from_object(
             self.playlist_info
                 .get("stats")
                 .ok_or("No stats")?
@@ -265,7 +259,7 @@ impl YTPlaylistExtractor {
         Ok(videoc)
     }
 
-    pub fn get_videos(&self) -> Result<Vec<YTStreamInfoItemExtractor>, ParsingError> {
+    pub fn videos(&self) -> Result<Vec<YTStreamInfoItemExtractor>, ParsingError> {
         if let Some((videos, _)) = &self.page {
             return Ok(videos.clone());
         }
@@ -290,7 +284,7 @@ impl YTPlaylistExtractor {
         YTPlaylistExtractor::collect_streams_from(videos)
     }
 
-    pub fn get_next_page_url(&self) -> Result<Option<String>, ParsingError> {
+    pub fn next_page_url(&self) -> Result<Option<String>, ParsingError> {
         if let Some((_, page_url)) = &self.page {
             Ok(page_url.clone())
         } else {
@@ -312,7 +306,7 @@ impl YTPlaylistExtractor {
                     .get("continuations")
             })();
             if let Some(conti) = conti {
-                Ok(YTPlaylistExtractor::get_next_page_url_from(conti))
+                Ok(YTPlaylistExtractor::next_page_url_from(conti))
             } else {
                 println!("Continuation is None");
                 Ok(None)

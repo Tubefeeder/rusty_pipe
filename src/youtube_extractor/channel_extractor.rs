@@ -1,5 +1,5 @@
 use crate::downloader_trait::Downloader;
-use crate::utils::utils::get_text_from_object;
+use crate::utils::utils::text_from_object;
 use crate::youtube_extractor::error::ParsingError;
 use crate::youtube_extractor::stream_extractor::{Thumbnail, HARDCODED_CLIENT_VERSION};
 use crate::youtube_extractor::stream_info_item_extractor::YTStreamInfoItemExtractor;
@@ -17,7 +17,7 @@ pub struct YTChannelExtractor {
 }
 
 impl YTChannelExtractor {
-    async fn get_initial_data<D: Downloader>(id: &str) -> Result<Value, ParsingError> {
+    async fn initial_data<D: Downloader>(id: &str) -> Result<Value, ParsingError> {
         let mut url = format!("{}{}/videos?pbj=1&view=0&flow=grid", CHANNEL_URL_BASE, id);
 
         let mut level = 0;
@@ -79,7 +79,7 @@ impl YTChannelExtractor {
         }
     }
 
-    fn get_video_tab(initial_data: &Value) -> Result<Value, ParsingError> {
+    fn video_tab(initial_data: &Value) -> Result<Value, ParsingError> {
         let tabs = (|| {
             initial_data
                 .get("contents")?
@@ -109,7 +109,7 @@ impl YTChannelExtractor {
             return Err(ParsingError::from("This channel has no Videos tab"));
         }
         let message_renderer_text = (|| {
-            Some(get_text_from_object(
+            Some(text_from_object(
                 video_tab
                     .get("content")?
                     .get("sectionListRenderer")?
@@ -139,10 +139,10 @@ impl YTChannelExtractor {
         page_url: Option<String>,
     ) -> Result<Self, ParsingError> {
         if let Some(page_url) = page_url {
-            let initial_data = YTChannelExtractor::get_initial_data::<D>(channel_id);
-            let page = YTChannelExtractor::get_page::<D>(&page_url);
+            let initial_data = YTChannelExtractor::initial_data::<D>(channel_id);
+            let page = YTChannelExtractor::page::<D>(&page_url);
             let (initial_data, page) = try_join!(initial_data, page)?;
-            let video_tab = YTChannelExtractor::get_video_tab(&initial_data)?;
+            let video_tab = YTChannelExtractor::video_tab(&initial_data)?;
 
             Ok(YTChannelExtractor {
                 initial_data,
@@ -150,8 +150,8 @@ impl YTChannelExtractor {
                 page: Some(page),
             })
         } else {
-            let initial_data = YTChannelExtractor::get_initial_data::<D>(channel_id).await?;
-            let video_tab = YTChannelExtractor::get_video_tab(&initial_data)?;
+            let initial_data = YTChannelExtractor::initial_data::<D>(channel_id).await?;
+            let video_tab = YTChannelExtractor::video_tab(&initial_data)?;
             Ok(YTChannelExtractor {
                 initial_data,
                 video_tab,
@@ -177,7 +177,7 @@ impl YTChannelExtractor {
         Ok(streams)
     }
 
-    fn get_next_page_url_from(continuation: &Value) -> Option<String> {
+    fn next_page_url_from(continuation: &Value) -> Option<String> {
         let next_continuation_data = continuation.get(0)?.get("nextContinuationData")?;
         let continuation = next_continuation_data.get("continuation")?.as_str()?;
         let click_tracking_params = next_continuation_data
@@ -189,7 +189,7 @@ impl YTChannelExtractor {
         ))
     }
 
-    async fn get_page<D: Downloader>(
+    async fn page<D: Downloader>(
         page_url: &str,
     ) -> Result<(Vec<YTStreamInfoItemExtractor>, Option<String>), ParsingError> {
         let mut headers = HashMap::new();
@@ -216,7 +216,7 @@ impl YTChannelExtractor {
                 .get("items")
                 .ok_or("items not in continuation")?,
         )?;
-        let next_url = YTChannelExtractor::get_next_page_url_from(
+        let next_url = YTChannelExtractor::next_page_url_from(
             section_list_continuation
                 .get("continuations")
                 .unwrap_or(&Value::Null),
@@ -227,7 +227,7 @@ impl YTChannelExtractor {
 }
 
 impl YTChannelExtractor {
-    pub fn get_name(&self) -> Result<String, ParsingError> {
+    pub fn name(&self) -> Result<String, ParsingError> {
         Ok((|| {
             self.initial_data
                 .get("header")?
@@ -239,7 +239,7 @@ impl YTChannelExtractor {
         .to_string())
     }
 
-    pub fn get_avatars(&self) -> Result<Vec<Thumbnail>, ParsingError> {
+    pub fn avatars(&self) -> Result<Vec<Thumbnail>, ParsingError> {
         let mut thumbnails = vec![];
         for thumb in self
             .initial_data
@@ -260,7 +260,7 @@ impl YTChannelExtractor {
         }
         Ok(thumbnails)
     }
-    pub fn get_banners(&self) -> Result<Vec<Thumbnail>, ParsingError> {
+    pub fn banners(&self) -> Result<Vec<Thumbnail>, ParsingError> {
         let mut thumbnails = vec![];
         for thumb in self
             .initial_data
@@ -282,7 +282,7 @@ impl YTChannelExtractor {
         Ok(thumbnails)
     }
 
-    pub fn get_videos(&self) -> Result<Vec<YTStreamInfoItemExtractor>, ParsingError> {
+    pub fn videos(&self) -> Result<Vec<YTStreamInfoItemExtractor>, ParsingError> {
         if let Some((videos, _)) = &self.page {
             return Ok(videos.clone());
         }
@@ -302,7 +302,7 @@ impl YTChannelExtractor {
         YTChannelExtractor::collect_streams_from(videos)
     }
 
-    pub fn get_next_page_url(&self) -> Result<Option<String>, ParsingError> {
+    pub fn next_page_url(&self) -> Result<Option<String>, ParsingError> {
         if let Some((_, page_url)) = &self.page {
             Ok(page_url.clone())
         } else {
@@ -319,7 +319,7 @@ impl YTChannelExtractor {
                     .get("continuations")
             })();
             if let Some(conti) = conti {
-                Ok(YTChannelExtractor::get_next_page_url_from(conti))
+                Ok(YTChannelExtractor::next_page_url_from(conti))
             } else {
                 println!("Continuation is None");
                 Ok(None)

@@ -8,9 +8,9 @@ pub struct YTStreamInfoItemExtractor {
     pub video_info: Map<String, Value>,
 }
 impl YTStreamInfoItemExtractor {
-    pub fn get_name(&self) -> Result<String, ParsingError> {
+    pub fn name(&self) -> Result<String, ParsingError> {
         if let Some(title) = self.video_info.get("title") {
-            let name = get_text_from_object(title, false)?;
+            let name = text_from_object(title, false)?;
             if let Some(name) = name {
                 if !name.is_empty() {
                     return Ok(name);
@@ -22,8 +22,8 @@ impl YTStreamInfoItemExtractor {
 
     pub fn is_ad(&self) -> Result<bool, ParsingError> {
         Ok(self.is_premium_video()?
-            || self.get_name()? == "[Private video]"
-            || self.get_name()? == "[Deleted video]")
+            || self.name()? == "[Private video]"
+            || self.name()? == "[Deleted video]")
     }
 
     pub fn video_id(&self) -> Result<String, ParsingError> {
@@ -60,7 +60,7 @@ impl YTStreamInfoItemExtractor {
         Ok(false)
     }
 
-    pub fn get_url(&self) -> Result<String, ParsingError> {
+    pub fn url(&self) -> Result<String, ParsingError> {
         let id = self.video_id()?;
         Ok(format!("https://www.youtube.com/watch?v={}", id))
     }
@@ -107,11 +107,11 @@ impl YTStreamInfoItemExtractor {
         Ok(false)
     }
 
-    pub fn get_textual_duration(&self) -> Result<String, ParsingError> {
+    pub fn textual_duration(&self) -> Result<String, ParsingError> {
         if self.is_live()? {
             return Ok("LIVE".to_string());
         }
-        let mut duration = get_text_from_object(
+        let mut duration = text_from_object(
             self.video_info
                 .get("lengthText")
                 .ok_or("Cant get lengthText")?,
@@ -128,10 +128,8 @@ impl YTStreamInfoItemExtractor {
                 if let Some(tr_renderer) =
                     thumbnail_overlay.get("thumbnailOverlayTimeStatusRenderer")
                 {
-                    duration = get_text_from_object(
-                        tr_renderer.get("text").unwrap_or(&Value::Null),
-                        false,
-                    )?;
+                    duration =
+                        text_from_object(tr_renderer.get("text").unwrap_or(&Value::Null), false)?;
                 }
             }
         }
@@ -142,11 +140,11 @@ impl YTStreamInfoItemExtractor {
         }
     }
 
-    pub fn get_duration(&self) -> Result<i32, ParsingError> {
+    pub fn duration(&self) -> Result<i32, ParsingError> {
         if self.is_live()? {
             return Ok(-1);
         }
-        let mut duration = get_text_from_object(
+        let mut duration = text_from_object(
             self.video_info
                 .get("lengthText")
                 .ok_or("Cant get lengthText")?,
@@ -163,10 +161,8 @@ impl YTStreamInfoItemExtractor {
                 if let Some(tr_renderer) =
                     thumbnail_overlay.get("thumbnailOverlayTimeStatusRenderer")
                 {
-                    duration = get_text_from_object(
-                        tr_renderer.get("text").unwrap_or(&Value::Null),
-                        false,
-                    )?;
+                    duration =
+                        text_from_object(tr_renderer.get("text").unwrap_or(&Value::Null), false)?;
                 }
             }
         }
@@ -178,8 +174,8 @@ impl YTStreamInfoItemExtractor {
         }
     }
 
-    pub fn get_uploader_name(&self) -> Result<String, ParsingError> {
-        let mut name = get_text_from_object(
+    pub fn uploader_name(&self) -> Result<String, ParsingError> {
+        let mut name = text_from_object(
             self.video_info
                 .get("longBylineText")
                 .unwrap_or(&Value::Null),
@@ -187,14 +183,14 @@ impl YTStreamInfoItemExtractor {
         )?
         .unwrap_or_default();
         if name.is_empty() {
-            name = get_text_from_object(
+            name = text_from_object(
                 self.video_info.get("ownerText").unwrap_or(&Value::Null),
                 false,
             )?
             .unwrap_or_default();
 
             if name.is_empty() {
-                name = get_text_from_object(
+                name = text_from_object(
                     self.video_info
                         .get("shortBylineText")
                         .unwrap_or(&Value::Null),
@@ -211,8 +207,8 @@ impl YTStreamInfoItemExtractor {
         Ok(name)
     }
 
-    pub fn get_uploader_url(&self) -> Result<String, ParsingError> {
-        let mut url = get_url_from_navigation_endpoint(
+    pub fn uploader_url(&self) -> Result<String, ParsingError> {
+        let mut url = url_from_navigation_endpoint(
             self.video_info
                 .get("longBylineText")
                 .unwrap_or(&Value::Null)
@@ -224,7 +220,7 @@ impl YTStreamInfoItemExtractor {
                 .unwrap_or(&Value::Null),
         );
         if url.is_err() || url.clone().unwrap_or_default().is_empty() {
-            url = get_url_from_navigation_endpoint(
+            url = url_from_navigation_endpoint(
                 self.video_info
                     .get("ownerText")
                     .unwrap_or(&Value::Null)
@@ -236,7 +232,7 @@ impl YTStreamInfoItemExtractor {
                     .unwrap_or(&Value::Null),
             );
             if url.is_err() || url.clone().unwrap_or_default().is_empty() {
-                url = get_url_from_navigation_endpoint(
+                url = url_from_navigation_endpoint(
                     self.video_info
                         .get("shortBylineText")
                         .unwrap_or(&Value::Null)
@@ -256,11 +252,11 @@ impl YTStreamInfoItemExtractor {
         url
     }
 
-    pub fn get_textual_upload_date(&self) -> Result<String, ParsingError> {
+    pub fn textual_upload_date(&self) -> Result<String, ParsingError> {
         if self.is_live()? {
             return Err(ParsingError::from("live video has no upload date"));
         }
-        let pt = get_text_from_object(
+        let pt = text_from_object(
             self.video_info
                 .get("publishedTimeText")
                 .unwrap_or(&Value::Null),
@@ -269,12 +265,12 @@ impl YTStreamInfoItemExtractor {
         Ok(pt.ok_or("Cant get upload date")?)
     }
 
-    pub fn get_textual_view_count(&self) -> Result<String, ParsingError> {
+    pub fn textual_view_count(&self) -> Result<String, ParsingError> {
         if self.is_premium_video()? || self.video_info.contains_key("topStandaloneBadge") {
             return Ok("".to_string());
         }
         if let Some(viewc) = self.video_info.get("viewCountText") {
-            let view_count = get_text_from_object(viewc, false)?.unwrap_or_default();
+            let view_count = text_from_object(viewc, false)?.unwrap_or_default();
             if view_count.to_ascii_lowercase().contains("no views") {
                 return Ok("no views".to_string());
             } else if view_count.to_ascii_lowercase().contains("recommended") {
@@ -287,12 +283,12 @@ impl YTStreamInfoItemExtractor {
         Err(ParsingError::from("Cant get view count"))
     }
 
-    pub fn get_view_count(&self) -> Result<i32, ParsingError> {
+    pub fn view_count(&self) -> Result<i32, ParsingError> {
         if self.is_premium_video()? || self.video_info.contains_key("topStandaloneBadge") {
             return Ok(-1);
         }
         if let Some(viewc) = self.video_info.get("viewCountText") {
-            let view_count = get_text_from_object(viewc, false)?.unwrap_or_default();
+            let view_count = text_from_object(viewc, false)?.unwrap_or_default();
             if view_count.to_ascii_lowercase().contains("no views") {
                 return Ok(0);
             } else if view_count.to_ascii_lowercase().contains("recommended") {
@@ -306,7 +302,7 @@ impl YTStreamInfoItemExtractor {
         Err(ParsingError::from("Cant get view count"))
     }
 
-    pub fn get_thumbnails(&self) -> Result<Vec<Thumbnail>, ParsingError> {
+    pub fn thumbnails(&self) -> Result<Vec<Thumbnail>, ParsingError> {
         let mut thumbnails = vec![];
         for thumb in self
             .video_info
@@ -324,7 +320,7 @@ impl YTStreamInfoItemExtractor {
         Ok(thumbnails)
     }
 
-    pub fn get_uploader_thumbnails(&self) -> Result<Vec<Thumbnail>, ParsingError> {
+    pub fn uploader_thumbnails(&self) -> Result<Vec<Thumbnail>, ParsingError> {
         let mut thumbnails = vec![];
         for thumb in self
             .video_info

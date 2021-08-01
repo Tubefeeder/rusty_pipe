@@ -11,7 +11,7 @@ pub struct YTTrendingExtractor {
 }
 
 impl YTTrendingExtractor {
-    async fn get_initial_data<D: Downloader>(_downloader: &D) -> Result<Value, ParsingError> {
+    async fn initial_data<D: Downloader>(_downloader: &D) -> Result<Value, ParsingError> {
         let url = format!("https://www.youtube.com/feed/trending?pbj=1");
         let mut headers = HashMap::new();
         headers.insert("X-YouTube-Client-Name".to_string(), "1".to_string());
@@ -32,13 +32,13 @@ impl YTTrendingExtractor {
     }
 
     pub async fn new<D: Downloader>(downloader: D) -> Result<Self, ParsingError> {
-        let initial_data = YTTrendingExtractor::get_initial_data(&downloader).await?;
+        let initial_data = YTTrendingExtractor::initial_data(&downloader).await?;
         Ok(Self { initial_data })
     }
 }
 
 impl YTTrendingExtractor {
-    pub fn get_videos(&self) -> Result<Vec<YTStreamInfoItemExtractor>, ParsingError> {
+    pub fn videos(&self) -> Result<Vec<YTStreamInfoItemExtractor>, ParsingError> {
         let item_section_renderers = (|| {
             self.initial_data
                 .get("contents")?

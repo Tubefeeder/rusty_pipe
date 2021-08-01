@@ -67,7 +67,7 @@ fn print_videos(videos: Vec<YTStreamInfoItemExtractor>) {
     for vid in videos {
         count += 1;
         println!("STREAM {}", count);
-        println!("title: {:#?}", vid.get_name());
+        println!("title: {:#?}", vid.name());
     }
 }
 
@@ -81,41 +81,32 @@ async fn main() -> Result<(), Error> {
     playlist_id = playlist_id.trim().to_string();
     let playlist_extractor =
         YTPlaylistExtractor::new(&playlist_id, DownloaderExample, None).await?;
-    println!("Playlist name {:#?}", playlist_extractor.get_name());
+    println!("Playlist name {:#?}", playlist_extractor.name());
     println!(
         "Playlist Thumbnails \n{:#?}",
-        playlist_extractor.get_thumbnails()
+        playlist_extractor.thumbnails()
     );
-    println!(
-        "Uploader name: {:#?}",
-        playlist_extractor.get_uploader_name()
-    );
-    println!("Uploader url: {:#?}", playlist_extractor.get_uploader_url());
+    println!("Uploader name: {:#?}", playlist_extractor.uploader_name());
+    println!("Uploader url: {:#?}", playlist_extractor.uploader_url());
     println!(
         "Uploaders thumbnails \n{:#?}",
-        playlist_extractor.get_uploader_avatars()
+        playlist_extractor.uploader_avatars()
     );
 
-    println!(
-        "Videos count : {:#?}",
-        playlist_extractor.get_stream_count()
-    );
+    println!("Videos count : {:#?}", playlist_extractor.stream_count());
 
     println!("Videos :\n");
     let mut videos = vec![];
-    videos.append(&mut playlist_extractor.get_videos()?);
-    println!(
-        "Next Page url: {:#?}",
-        playlist_extractor.get_next_page_url()
-    );
+    videos.append(&mut playlist_extractor.videos()?);
+    println!("Next Page url: {:#?}", playlist_extractor.next_page_url());
 
-    let mut next_page_url = playlist_extractor.get_next_page_url()?;
+    let mut next_page_url = playlist_extractor.next_page_url()?;
 
     while let Some(next_page) = next_page_url.clone() {
         let extractor =
             YTPlaylistExtractor::new(&playlist_id, DownloaderExample, Some(next_page)).await?;
-        next_page_url = extractor.get_next_page_url()?;
-        videos.append(&mut playlist_extractor.get_videos()?);
+        next_page_url = extractor.next_page_url()?;
+        videos.append(&mut playlist_extractor.videos()?);
         println!("Next page url {:#?}", next_page_url);
     }
     print_videos(videos);

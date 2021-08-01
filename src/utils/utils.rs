@@ -68,9 +68,7 @@ pub fn fix_thumbnail_url(url: &str) -> String {
     }
 }
 
-pub fn get_url_from_navigation_endpoint(
-    navigation_endpoint: &Value,
-) -> Result<String, ParsingError> {
+pub fn url_from_navigation_endpoint(navigation_endpoint: &Value) -> Result<String, ParsingError> {
     if let Some(intern_url) = navigation_endpoint
         .get("urlEndpoint")
         .and_then(|ue| ue.get("url"))
@@ -147,10 +145,7 @@ pub fn get_url_from_navigation_endpoint(
     Ok("".to_string())
 }
 
-pub fn get_text_from_object(
-    text_object: &Value,
-    html: bool,
-) -> Result<Option<String>, ParsingError> {
+pub fn text_from_object(text_object: &Value, html: bool) -> Result<Option<String>, ParsingError> {
     if let Some(simple_text) = text_object.get("simpleText") {
         return Ok(Some(
             simple_text
@@ -169,7 +164,7 @@ pub fn get_text_from_object(
                 .to_string();
             if html {
                 if let Some(navp) = text_part.get("navigationEndpoint") {
-                    let url = get_url_from_navigation_endpoint(navp)?;
+                    let url = url_from_navigation_endpoint(navp)?;
                     if !url.is_empty() {
                         text += &format!("<a href=\"{}\">{}</a>", url, text_p);
                         continue;

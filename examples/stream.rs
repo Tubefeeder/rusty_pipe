@@ -16,37 +16,34 @@ async fn main() -> Result<(), failure::Error> {
     let downloader = DownloaderExample {};
 
     let stream_extractor = YTStreamExtractor::new("09R8_2nJtjg", downloader).await?;
-    let video_streams = stream_extractor.get_video_stream()?;
+    let video_streams = stream_extractor.video_stream()?;
     println!("AUDIO/VIDEO STREAMS \n");
     println!("{:#?}", video_streams);
 
-    let audio_streams = stream_extractor.get_audio_streams()?;
+    let audio_streams = stream_extractor.audio_streams()?;
     println!("AUDIO ONLY STREAMS \n");
     println!("{:#?}", audio_streams);
 
-    let video_only_streams = stream_extractor.get_video_only_stream()?;
+    let video_only_streams = stream_extractor.video_only_stream()?;
     println!("VIDEO ONLY STREAMS \n");
     println!("{:#?}", video_only_streams);
 
-    let thumbnails = stream_extractor.get_video_thumbnails();
+    let thumbnails = stream_extractor.video_thumbnails();
     println!("\nTHUMBNAILS");
     println!("{:#?}", thumbnails);
 
     println!("\nMETADATA");
-    println!("title: {:#?}", stream_extractor.get_name());
-    println!(
-        "description:\n{:#?}",
-        stream_extractor.get_description(false)
-    );
-    println!("duration: {:#?}", stream_extractor.get_length());
-    println!("views: {:#?}", stream_extractor.get_view_count());
-    println!("likes: {:#?}", stream_extractor.get_like_count());
-    println!("dislikes: {:#?}", stream_extractor.get_dislike_count());
-    println!("uploader url: {:#?}", stream_extractor.get_uploader_url());
-    println!("uploader name: {:#?}", stream_extractor.get_uploader_name());
+    println!("title: {:#?}", stream_extractor.name());
+    println!("description:\n{:#?}", stream_extractor.description(false));
+    println!("duration: {:#?}", stream_extractor.length());
+    println!("views: {:#?}", stream_extractor.view_count());
+    println!("likes: {:#?}", stream_extractor.like_count());
+    println!("dislikes: {:#?}", stream_extractor.dislike_count());
+    println!("uploader url: {:#?}", stream_extractor.uploader_url());
+    println!("uploader name: {:#?}", stream_extractor.uploader_name());
     println!(
         "uploader thumbnails:\n {:#?}",
-        stream_extractor.get_uploader_avatar_url()
+        stream_extractor.uploader_avatar_url()
     );
     Ok(())
 }
