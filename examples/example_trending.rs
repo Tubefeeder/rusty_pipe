@@ -1,13 +1,14 @@
 extern crate rusty_pipe;
 
-use async_trait::async_trait;
-use failure::Error;
-use rusty_pipe::downloader_trait::Downloader;
-use rusty_pipe::youtube_extractor::error::ParsingError;
-use rusty_pipe::youtube_extractor::stream_info_item_extractor::YTStreamInfoItemExtractor;
-use rusty_pipe::youtube_extractor::trending_extractor::YTTrendingExtractor;
+use rusty_pipe::extractors::{YTStreamInfoItemExtractor, YTTrendingExtractor};
+use rusty_pipe::Downloader;
+use rusty_pipe::ParsingError;
+
 use std::collections::HashMap;
 use std::str::FromStr;
+
+use async_trait::async_trait;
+use failure::Error;
 
 struct DownloaderExample;
 

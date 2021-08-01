@@ -1,14 +1,14 @@
 extern crate rusty_pipe;
 
-use rusty_pipe::downloader_trait::Downloader;
+use rusty_pipe::extractors::{YTChannelExtractor, YTStreamInfoItemExtractor};
+use rusty_pipe::Downloader;
+use rusty_pipe::ParsingError;
+
 use std::collections::HashMap;
 use std::str::FromStr;
 
 use async_trait::async_trait;
 use failure::Error;
-use rusty_pipe::youtube_extractor::channel_extractor::YTChannelExtractor;
-use rusty_pipe::youtube_extractor::error::ParsingError;
-use rusty_pipe::youtube_extractor::stream_info_item_extractor::YTStreamInfoItemExtractor;
 
 struct DownloaderExample;
 
@@ -54,11 +54,8 @@ impl Downloader for DownloaderExample {
     fn eval_js(script: &str) -> Result<String, String> {
         use quick_js::Context;
         let context = Context::new().expect("Cant create js context");
-        // println!("decryption code \n{}",decryption_code);
-        // println!("signature : {}",encrypted_sig);
         println!("jscode \n{}", script);
         let res = context.eval(script).unwrap_or(quick_js::JsValue::Null);
-        // println!("js result : {:?}", result);
         let result = res.into_string().unwrap_or("".to_string());
         print!("JS result: {}", result);
         Ok(result)
@@ -90,7 +87,6 @@ async fn main() -> Result<(), Error> {
     );
     println!("Channel Banners \n{:#?}", channel_extractor.get_banners());
     println!("Videos :\n");
-    // print_videos(channel_extractor.get_videos()?);
     let mut videos = vec![];
     videos.append(&mut channel_extractor.get_videos()?);
     println!(
@@ -103,7 +99,6 @@ async fn main() -> Result<(), Error> {
     while let Some(next_page) = next_page_url.clone() {
         let extractor =
             YTChannelExtractor::new::<DownloaderExample>(&channel_id, Some(next_page)).await?;
-        // print_videos(extractor.get_videos()?);
         next_page_url = extractor.get_next_page_url()?;
         videos.append(&mut channel_extractor.get_videos()?);
         println!("Next page url {:#?}", next_page_url);

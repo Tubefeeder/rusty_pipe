@@ -1,16 +1,17 @@
 extern crate rusty_pipe;
 
-use rusty_pipe::youtube_extractor::search_extractor::*;
-use std::io;
+use rusty_pipe::elements::YTSearchItem;
+use rusty_pipe::extractors::YTSearchExtractor;
+use rusty_pipe::Downloader;
+use rusty_pipe::ParsingError;
 
-use rusty_pipe::downloader_trait::Downloader;
 use std::collections::HashMap;
+use std::io;
 use std::str::FromStr;
-use urlencoding::encode;
 
 use async_trait::async_trait;
 use failure::Error;
-use rusty_pipe::youtube_extractor::error::ParsingError;
+use urlencoding::encode;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -189,11 +190,8 @@ impl Downloader for DownloaderExample {
     fn eval_js(script: &str) -> Result<String, String> {
         use quick_js::Context;
         let context = Context::new().expect("Cant create js context");
-        // println!("decryption code \n{}",decryption_code);
-        // println!("signature : {}",encrypted_sig);
         println!("jscode \n{}", script);
         let res = context.eval(script).unwrap_or(quick_js::JsValue::Null);
-        // println!("js result : {:?}", result);
         let result = res.into_string().unwrap_or("".to_string());
         print!("JS result: {}", result);
         Ok(result)
