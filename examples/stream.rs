@@ -35,6 +35,7 @@ async fn main() -> Result<(), failure::Error> {
     println!("\nMETADATA");
     println!("title: {:#?}", stream_extractor.name());
     println!("description:\n{:#?}", stream_extractor.description(false));
+    println!("uploaded:\n{:#?}", stream_extractor.upload_date());
     println!("duration: {:#?}", stream_extractor.length());
     println!("views: {:#?}", stream_extractor.view_count());
     println!("likes: {:#?}", stream_extractor.like_count());

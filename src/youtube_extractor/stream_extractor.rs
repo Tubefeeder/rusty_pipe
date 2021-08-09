@@ -90,32 +90,16 @@ impl<D: Downloader> YTStreamExtractor<D> {
         let secondary_info_renderer =
             YTStreamExtractor::<D>::secondary_info_renderer(&initial_data)?;
         if let Some(response) = initial_response {
-            if Self::is_decryption_needed(&response).unwrap_or(false) {
-                let player_url = Self::player_js_url(video_id, &downloader).await?;
-                let player_code =
-                    YTStreamExtractor::<D>::player_code(&player_url, &downloader).await?;
-                Ok(YTStreamExtractor {
-                    player_response: response,
-                    downloader,
-                    player_code,
-                    initial_data,
-                    primary_info_renderer,
-                    secondary_info_renderer,
-                    doc: String::from(doc),
-                    video_id: String::from(video_id),
-                })
-            } else {
-                Ok(YTStreamExtractor {
-                    player_response: response,
-                    downloader,
-                    player_code: "".to_owned(),
-                    initial_data,
-                    primary_info_renderer,
-                    secondary_info_renderer,
-                    doc: String::from(doc),
-                    video_id: String::from(video_id),
-                })
-            }
+            Ok(YTStreamExtractor {
+                player_response: response,
+                downloader,
+                player_code: "".to_owned(),
+                initial_data,
+                primary_info_renderer,
+                secondary_info_renderer,
+                doc: String::from(doc),
+                video_id: String::from(video_id),
+            })
         } else {
             // OLD METHOD
             let player_config = YTStreamExtractor::<D>::player_config(&doc)
@@ -138,28 +122,6 @@ impl<D: Downloader> YTStreamExtractor<D> {
                 secondary_info_renderer,
                 doc: String::from(doc),
                 video_id: String::from(video_id),
-            })
-        }
-    }
-
-    fn is_decryption_needed(player_response: &Map<String, Value>) -> Result<bool, ParsingError> {
-        let streaming_data = player_response.get("streamingData").unwrap_or(&Value::Null);
-        if let Value::Object(streaming_data) = streaming_data {
-            if let Value::Array(formats) = streaming_data.get(FORMATS).unwrap_or(&Value::Null) {
-                if let Some(format_data) = formats.first() {
-                    match format_data.get("url").unwrap_or(&Value::Null) {
-                        Value::String(_url) => Ok(false),
-                        _ => Ok(true),
-                    }
-                } else {
-                    Ok(false)
-                }
-            } else {
-                Ok(false)
-            }
-        } else {
-            Err(ParsingError::ParsingError {
-                cause: "Streaming data not found in player response".to_string(),
             })
         }
     }
@@ -324,33 +286,6 @@ impl<D: Downloader> YTStreamExtractor<D> {
         let data = D::download_with_header(&url, headers).await?;
         let initial_ajax_json: Value = serde_json::from_str(&data).map_err(|e| e.to_string())?;
         Ok(initial_ajax_json)
-    }
-
-    async fn player_js_url(video_id: &str, _downloader: &D) -> Result<String, ParsingError> {
-        let embed_url = format!("https://www.youtube.com/embed/{}", video_id);
-        let mut headers = HashMap::new();
-        headers.insert("X-YouTube-Client-Name".to_string(), "1".to_string());
-        headers.insert(
-            "X-YouTube-Client-Version".to_string(),
-            HARDCODED_CLIENT_VERSION.to_string(),
-        );
-        let data = D::download_with_header(&embed_url, headers).await?;
-        let asset_pattern = "\"assets\":.+?\"js\":\\s*(\"[^\"]+\")";
-        let url1 = Self::match_group1(asset_pattern, &data);
-        match url1 {
-            Ok(url) => {
-                let url = url.replace("\\", "").replace("\"", "");
-                let url = Self::fix_player_url(&url);
-                Ok(url)
-            }
-            Err(_) => {
-                let srcreg = r###"script.*src\s*="(.*)"\s*.*name\s*=\s*"player_ias\/base""###;
-                let url = Self::match_group1(srcreg, &data);
-                let url = url.and_then(|url| Ok(Self::fix_player_url(&url)));
-                log::debug!("Player url {:#?}", url);
-                url
-            }
-        }
     }
 
     async fn initial_data(initial_ajax_json: &Value) -> Result<(Value, bool), ParsingError> {
@@ -520,6 +455,68 @@ impl<D: Downloader> YTStreamExtractor<D> {
             Err(ParsingError::parsing_error_from_str("Cant get title"))
         } else {
             Ok(title)
+        }
+    }
+
+    pub fn upload_date(&self) -> Result<chrono::NaiveDate, ParsingError> {
+        self.textual_upload_date()
+            .map(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d"))?
+            .map_err(|_e| ParsingError::parsing_error_from_str("Cannot parse date"))
+    }
+
+    pub fn textual_upload_date(&self) -> Result<String, ParsingError> {
+        let micro = self
+            .player_response
+            .get("microformat")
+            .ok_or(ParsingError::parsing_error_from_str(
+                "Cannot get upload date (microformat)",
+            ))?
+            .get("playerMicroformatRenderer")
+            .ok_or(ParsingError::parsing_error_from_str(
+                "Cannot get upload date (playerMicroformatRenderer)",
+            ))?;
+
+        if let Some(date) = micro.get("uploadDate") {
+            return date
+                .as_str()
+                .ok_or(ParsingError::parsing_error_from_str(
+                    "Cannot get upload date (uploadDate)",
+                ))
+                .map(|s| s.to_owned());
+        } else if let Some(date) = micro.get("publishDate") {
+            return date
+                .as_str()
+                .ok_or(ParsingError::parsing_error_from_str(
+                    "Cannot get upload date (publishDate)",
+                ))
+                .map(|s| s.to_owned());
+        } else {
+            // Stream is a lifestream
+            let life_details =
+                micro
+                    .get("liveBroadcastDetails")
+                    .ok_or(ParsingError::parsing_error_from_str(
+                        "Cannot get upload date (liveBroadcastDetails)",
+                    ))?;
+            if let Some(date) = life_details.get("endTimestamp") {
+                return date
+                    .as_str()
+                    .ok_or(ParsingError::parsing_error_from_str(
+                        "Cannot get upload date (endTimestamp)",
+                    ))
+                    .map(|s| s.to_owned());
+            } else if let Some(date) = life_details.get("startTimestamp") {
+                return date
+                    .as_str()
+                    .ok_or(ParsingError::parsing_error_from_str(
+                        "Cannot get upload date (startTimestamp)",
+                    ))
+                    .map(|s| s.to_owned());
+            } else {
+                return Err(ParsingError::parsing_error_from_str(
+                    "Cannot get upload date (everyhting)",
+                ));
+            }
         }
     }
 
