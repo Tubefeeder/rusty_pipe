@@ -13,8 +13,65 @@ use async_trait::async_trait;
 use failure::Error;
 use urlencoding::encode;
 
+#[derive(Clone)]
+struct DownloaderExample(reqwest::Client);
+
+#[async_trait]
+impl Downloader for DownloaderExample {
+    async fn download(&self, url: &str) -> Result<String, ParsingError> {
+        println!("query url : {}", url);
+        let resp = self
+            .0
+            .get(url)
+            .send()
+            .await
+            .map_err(|er| ParsingError::DownloadError {
+                cause: er.to_string(),
+            })?;
+        println!("got response ");
+        let body = resp
+            .text()
+            .await
+            .map_err(|er| ParsingError::DownloadError {
+                cause: er.to_string(),
+            })?;
+        println!("suceess query");
+        Ok(String::from(body))
+    }
+
+    async fn download_with_header(
+        &self,
+        url: &str,
+        header: HashMap<String, String>,
+    ) -> Result<String, ParsingError> {
+        let res = self.0.get(url);
+        let mut headers = reqwest::header::HeaderMap::new();
+        for header in header {
+            headers.insert(
+                reqwest::header::HeaderName::from_str(&header.0).map_err(|e| e.to_string())?,
+                header.1.parse().unwrap(),
+            );
+        }
+        let res = res.headers(headers);
+        let res = res.send().await.map_err(|er| er.to_string())?;
+        let body = res.text().await.map_err(|er| er.to_string())?;
+        Ok(String::from(body))
+    }
+
+    fn eval_js(&self, script: &str) -> Result<String, String> {
+        use quick_js::Context;
+        let context = Context::new().expect("Cant create js context");
+        println!("jscode \n{}", script);
+        let res = context.eval(script).unwrap_or(quick_js::JsValue::Null);
+        let result = res.into_string().unwrap_or("".to_string());
+        print!("JS result: {}", result);
+        Ok(result)
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Error> {
+    let downloader = DownloaderExample(reqwest::Client::new());
     let mut search_query = String::new();
     println!("Enter Search Query");
     io::stdin()
@@ -23,9 +80,9 @@ async fn main() -> Result<(), Error> {
 
     search_query = encode(&search_query);
 
-    let search_extractor = YTSearchExtractor::new::<DownloaderExample>(&search_query, None).await?;
+    let search_extractor = YTSearchExtractor::new(downloader.clone(), &search_query, None).await?;
     let search_suggestion =
-        YTSearchExtractor::search_suggestion::<DownloaderExample>(&search_query).await?;
+        YTSearchExtractor::search_suggestion(&downloader, &search_query).await?;
 
     println!("Search suggestion {:#?}", search_suggestion);
     let mut items = search_extractor.search_results()?;
@@ -38,7 +95,7 @@ async fn main() -> Result<(), Error> {
             break;
         }
         let search_extractor =
-            YTSearchExtractor::new::<DownloaderExample>(&search_query, Some(url)).await?;
+            YTSearchExtractor::new(downloader.clone(), &search_query, Some(url)).await?;
         items.append(&mut search_extractor.search_results()?);
         next_url = search_extractor.next_page_url()?;
         println!("Next page url : {:#?}", next_url);
@@ -131,56 +188,4 @@ async fn main() -> Result<(), Error> {
     }
 
     Ok(())
-}
-
-struct DownloaderExample;
-
-#[async_trait]
-impl Downloader for DownloaderExample {
-    async fn download(url: &str) -> Result<String, ParsingError> {
-        println!("query url : {}", url);
-        let resp = reqwest::get(url)
-            .await
-            .map_err(|er| ParsingError::DownloadError {
-                cause: er.to_string(),
-            })?;
-        println!("got response ");
-        let body = resp
-            .text()
-            .await
-            .map_err(|er| ParsingError::DownloadError {
-                cause: er.to_string(),
-            })?;
-        println!("suceess query");
-        Ok(String::from(body))
-    }
-
-    async fn download_with_header(
-        url: &str,
-        header: HashMap<String, String>,
-    ) -> Result<String, ParsingError> {
-        let client = reqwest::Client::new();
-        let res = client.get(url);
-        let mut headers = reqwest::header::HeaderMap::new();
-        for header in header {
-            headers.insert(
-                reqwest::header::HeaderName::from_str(&header.0).map_err(|e| e.to_string())?,
-                header.1.parse().unwrap(),
-            );
-        }
-        let res = res.headers(headers);
-        let res = res.send().await.map_err(|er| er.to_string())?;
-        let body = res.text().await.map_err(|er| er.to_string())?;
-        Ok(String::from(body))
-    }
-
-    fn eval_js(script: &str) -> Result<String, String> {
-        use quick_js::Context;
-        let context = Context::new().expect("Cant create js context");
-        println!("jscode \n{}", script);
-        let res = context.eval(script).unwrap_or(quick_js::JsValue::Null);
-        let result = res.into_string().unwrap_or("".to_string());
-        print!("JS result: {}", result);
-        Ok(result)
-    }
 }

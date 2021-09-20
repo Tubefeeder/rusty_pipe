@@ -10,13 +10,17 @@ use std::str::FromStr;
 use async_trait::async_trait;
 use failure::Error;
 
-struct DownloaderExample;
+#[derive(Clone)]
+struct DownloaderExample(reqwest::Client);
 
 #[async_trait]
 impl Downloader for DownloaderExample {
-    async fn download(url: &str) -> Result<String, ParsingError> {
+    async fn download(&self, url: &str) -> Result<String, ParsingError> {
         println!("query url : {}", url);
-        let resp = reqwest::get(url)
+        let resp = self
+            .0
+            .get(url)
+            .send()
             .await
             .map_err(|er| ParsingError::DownloadError {
                 cause: er.to_string(),
@@ -33,11 +37,11 @@ impl Downloader for DownloaderExample {
     }
 
     async fn download_with_header(
+        &self,
         url: &str,
         header: HashMap<String, String>,
     ) -> Result<String, ParsingError> {
-        let client = reqwest::Client::new();
-        let res = client.get(url);
+        let res = self.0.get(url);
         let mut headers = reqwest::header::HeaderMap::new();
         for header in header {
             headers.insert(
@@ -51,7 +55,7 @@ impl Downloader for DownloaderExample {
         Ok(String::from(body))
     }
 
-    fn eval_js(script: &str) -> Result<String, String> {
+    fn eval_js(&self, script: &str) -> Result<String, String> {
         use quick_js::Context;
         let context = Context::new().expect("Cant create js context");
         println!("jscode \n{}", script);
@@ -73,13 +77,14 @@ fn print_videos(videos: Vec<YTStreamInfoItemExtractor>) {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
+    let downloader = DownloaderExample(reqwest::Client::new());
     println!("Enter channel id: ");
     let mut channel_id = String::new();
     std::io::stdin()
         .read_line(&mut channel_id)
         .expect("Input failed");
     channel_id = channel_id.trim().to_string();
-    let channel_extractor = YTChannelExtractor::new::<DownloaderExample>(&channel_id, None).await?;
+    let channel_extractor = YTChannelExtractor::new(downloader.clone(), &channel_id, None).await?;
     println!("Channel name {:#?}", channel_extractor.name());
     println!("Channel Thumbnails \n{:#?}", channel_extractor.avatars());
     println!("Channel Banners \n{:#?}", channel_extractor.banners());
@@ -92,7 +97,7 @@ async fn main() -> Result<(), Error> {
 
     while let Some(next_page) = next_page_url.clone() {
         let extractor =
-            YTChannelExtractor::new::<DownloaderExample>(&channel_id, Some(next_page)).await?;
+            YTChannelExtractor::new(downloader.clone(), &channel_id, Some(next_page)).await?;
         next_page_url = extractor.next_page_url()?;
         videos.append(&mut channel_extractor.videos()?);
         println!("Next page url {:#?}", next_page_url);

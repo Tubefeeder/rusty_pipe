@@ -10,13 +10,17 @@ use std::str::FromStr;
 use async_trait::async_trait;
 use failure::Error;
 
-struct DownloaderExample;
+#[derive(Clone)]
+struct DownloaderExample(reqwest::Client);
 
 #[async_trait]
 impl Downloader for DownloaderExample {
-    async fn download(url: &str) -> Result<String, ParsingError> {
+    async fn download(&self, url: &str) -> Result<String, ParsingError> {
         println!("query url : {}", url);
-        let resp = reqwest::get(url)
+        let resp = self
+            .0
+            .get(url)
+            .send()
             .await
             .map_err(|er| ParsingError::DownloadError {
                 cause: er.to_string(),
@@ -33,11 +37,11 @@ impl Downloader for DownloaderExample {
     }
 
     async fn download_with_header(
+        &self,
         url: &str,
         header: HashMap<String, String>,
     ) -> Result<String, ParsingError> {
-        let client = reqwest::Client::new();
-        let res = client.get(url);
+        let res = self.0.get(url);
         let mut headers = reqwest::header::HeaderMap::new();
         for header in header {
             headers.insert(
@@ -51,7 +55,7 @@ impl Downloader for DownloaderExample {
         Ok(String::from(body))
     }
 
-    fn eval_js(script: &str) -> Result<String, String> {
+    fn eval_js(&self, script: &str) -> Result<String, String> {
         use quick_js::Context;
         let context = Context::new().expect("Cant create js context");
         println!("jscode \n{}", script);
@@ -73,6 +77,7 @@ fn print_videos(videos: Vec<YTStreamInfoItemExtractor>) {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
+    let downloader = DownloaderExample(reqwest::Client::new());
     println!("Enter playlist id: ");
     let mut playlist_id = String::new();
     std::io::stdin()
@@ -80,7 +85,7 @@ async fn main() -> Result<(), Error> {
         .expect("Input failed");
     playlist_id = playlist_id.trim().to_string();
     let playlist_extractor =
-        YTPlaylistExtractor::new(&playlist_id, DownloaderExample, None).await?;
+        YTPlaylistExtractor::new(downloader.clone(), &playlist_id, None).await?;
     println!("Playlist name {:#?}", playlist_extractor.name());
     println!(
         "Playlist Thumbnails \n{:#?}",
@@ -104,7 +109,7 @@ async fn main() -> Result<(), Error> {
 
     while let Some(next_page) = next_page_url.clone() {
         let extractor =
-            YTPlaylistExtractor::new(&playlist_id, DownloaderExample, Some(next_page)).await?;
+            YTPlaylistExtractor::new(downloader.clone(), &playlist_id, Some(next_page)).await?;
         next_page_url = extractor.next_page_url()?;
         videos.append(&mut playlist_extractor.videos()?);
         println!("Next page url {:#?}", next_page_url);

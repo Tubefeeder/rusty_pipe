@@ -6,12 +6,13 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 #[derive(Clone, PartialEq)]
-pub struct YTTrendingExtractor {
+pub struct YTTrendingExtractor<D> {
+    downloader: D,
     initial_data: Value,
 }
 
-impl YTTrendingExtractor {
-    async fn initial_data<D: Downloader>(_downloader: &D) -> Result<Value, ParsingError> {
+impl<D: Downloader> YTTrendingExtractor<D> {
+    async fn initial_data(downloader: &D) -> Result<Value, ParsingError> {
         let url = format!("https://www.youtube.com/feed/trending?pbj=1");
         let mut headers = HashMap::new();
         headers.insert("X-YouTube-Client-Name".to_string(), "1".to_string());
@@ -20,7 +21,7 @@ impl YTTrendingExtractor {
             HARDCODED_CLIENT_VERSION.to_string(),
         );
         let url = format!("{}&pbj=1", url);
-        let data = D::download_with_header(&url, headers).await?;
+        let data = downloader.download_with_header(&url, headers).await?;
         let mut json =
             serde_json::from_str::<Value>(&data).map_err(|e| ParsingError::from(e.to_string()))?;
         Ok(json
@@ -31,13 +32,16 @@ impl YTTrendingExtractor {
             .take())
     }
 
-    pub async fn new<D: Downloader>(downloader: D) -> Result<Self, ParsingError> {
+    pub async fn new(downloader: D) -> Result<Self, ParsingError> {
         let initial_data = YTTrendingExtractor::initial_data(&downloader).await?;
-        Ok(Self { initial_data })
+        Ok(Self {
+            downloader,
+            initial_data,
+        })
     }
 }
 
-impl YTTrendingExtractor {
+impl<D: Downloader> YTTrendingExtractor<D> {
     pub fn videos(&self) -> Result<Vec<YTStreamInfoItemExtractor>, ParsingError> {
         let item_section_renderers = (|| {
             self.initial_data

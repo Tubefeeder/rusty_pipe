@@ -67,15 +67,15 @@ pub struct Thumbnail {
 }
 
 impl<D: Downloader> YTStreamExtractor<D> {
-    pub async fn new(video_id: &str, downloader: D) -> Result<Self, ParsingError> {
+    pub async fn new(downloader: D, video_id: &str) -> Result<Self, ParsingError> {
         use futures::try_join;
         let url = format!(
             "https://www.youtube.com/watch?v={}&disable_polymer=1",
             video_id
         );
 
-        let doc = D::download(&url);
-        let inital_ajax_json = Self::initial_ajax_json(&url, &downloader).await?;
+        let doc = downloader.download(&url);
+        let inital_ajax_json = Self::initial_ajax_json(&downloader, &url).await?;
         let initial_data = YTStreamExtractor::<D>::initial_data(&inital_ajax_json);
         let (doc, initial_data) = try_join!(doc, initial_data)?;
 
@@ -112,7 +112,7 @@ impl<D: Downloader> YTStreamExtractor<D> {
                 .ok_or("cannot get player response".to_string())?;
             let player_url = YTStreamExtractor::<D>::player_url(&player_config)
                 .ok_or("Cant get player url".to_owned())?;
-            let player_code = YTStreamExtractor::<D>::player_code(&player_url, &downloader).await?;
+            let player_code = YTStreamExtractor::<D>::player_code(&downloader, &player_url).await?;
             Ok(YTStreamExtractor {
                 player_response,
                 downloader,
@@ -127,6 +127,7 @@ impl<D: Downloader> YTStreamExtractor<D> {
     }
 
     fn itags(
+        downloader: &D,
         streaming_data_key: &str,
         itag_type_wanted: ItagType,
         player_response: &Map<String, Value>,
@@ -161,6 +162,7 @@ impl<D: Downloader> YTStreamExtractor<D> {
                                     cipher.get("url").unwrap_or(&String::default()),
                                     cipher.get("sp").unwrap_or(&String::default()),
                                     &YTStreamExtractor::<D>::decrypt_signature(
+                                        downloader,
                                         cipher.get("s").unwrap_or(&"".to_owned()),
                                         decryption_code
                                     )
@@ -199,7 +201,7 @@ impl<D: Downloader> YTStreamExtractor<D> {
         Ok(url_and_itags)
     }
 
-    pub async fn player_code(player_url: &str, _downloader: &D) -> Result<String, ParsingError> {
+    pub async fn player_code(downloader: &D, player_url: &str) -> Result<String, ParsingError> {
         let player_url = {
             if player_url.starts_with("http://") || player_url.starts_with("https://") {
                 player_url.to_string()
@@ -207,17 +209,17 @@ impl<D: Downloader> YTStreamExtractor<D> {
                 format!("https://youtube.com{}", player_url)
             }
         };
-        let player_code = D::download(&player_url).await?;
+        let player_code = downloader.download(&player_url).await?;
         let player_code = YTStreamExtractor::<D>::load_decryption_code(&player_code)?;
         Ok(player_code)
     }
 
-    fn decrypt_signature(encrypted_sig: &str, decryption_code: &str) -> String {
+    fn decrypt_signature(downloader: &D, encrypted_sig: &str, decryption_code: &str) -> String {
         println!("encrypted_sig: {:#?}", encrypted_sig);
         println!("decryption_code {:#?}", decryption_code);
 
         let script = format!("{};decrypt(\"{}\")", decryption_code, encrypted_sig);
-        let res = D::eval_js(&script);
+        let res = downloader.eval_js(&script);
 
         let result = res.unwrap_or_default();
 
@@ -275,7 +277,7 @@ impl<D: Downloader> YTStreamExtractor<D> {
         Some(player_response.as_object()?.to_owned())
     }
 
-    async fn initial_ajax_json(url: &str, _downloader: &D) -> Result<Value, ParsingError> {
+    async fn initial_ajax_json(downloader: &D, url: &str) -> Result<Value, ParsingError> {
         let mut headers = HashMap::new();
         headers.insert("X-YouTube-Client-Name".to_string(), "1".to_string());
         headers.insert(
@@ -283,7 +285,7 @@ impl<D: Downloader> YTStreamExtractor<D> {
             HARDCODED_CLIENT_VERSION.to_string(),
         );
         let url = format!("{}&pbj=1", url);
-        let data = D::download_with_header(&url, headers).await?;
+        let data = downloader.download_with_header(&url, headers).await?;
         let initial_ajax_json: Value = serde_json::from_str(&data).map_err(|e| e.to_string())?;
         Ok(initial_ajax_json)
     }
@@ -790,6 +792,7 @@ impl<D: Downloader> YTStreamExtractor<D> {
     pub fn video_stream(&self) -> Result<Vec<StreamItem>, ParsingError> {
         let mut video_streams = vec![];
         for entry in YTStreamExtractor::<D>::itags(
+            &self.downloader,
             FORMATS,
             ItagType::Video,
             &self.player_response,
@@ -807,6 +810,7 @@ impl<D: Downloader> YTStreamExtractor<D> {
     pub fn video_only_stream(&self) -> Result<Vec<StreamItem>, ParsingError> {
         let mut video_streams = vec![];
         for entry in YTStreamExtractor::<D>::itags(
+            &self.downloader,
             ADAPTIVE_FORMATS,
             ItagType::VideoOnly,
             &self.player_response,
@@ -824,6 +828,7 @@ impl<D: Downloader> YTStreamExtractor<D> {
     pub fn audio_streams(&self) -> Result<Vec<StreamItem>, ParsingError> {
         let mut audio_streams = vec![];
         for entry in YTStreamExtractor::<D>::itags(
+            &self.downloader,
             ADAPTIVE_FORMATS,
             ItagType::Audio,
             &self.player_response,
@@ -852,7 +857,7 @@ impl<D: Downloader> YTStreamExtractor<D> {
         })()
         .unwrap_or_default();
         use crate::youtube_extractor::search_extractor::YTSearchExtractor;
-        let items = YTSearchExtractor::collect_streams_from(&results);
+        let items = YTSearchExtractor::<D>::collect_streams_from(&results);
         items
     }
 }

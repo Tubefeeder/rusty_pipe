@@ -7,34 +7,37 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 #[derive(Clone, PartialEq)]
-pub struct YTPlaylistExtractor {
+pub struct YTPlaylistExtractor<D> {
+    downloader: D,
     init_data: Value,
     playlist_info: Value,
     page: Option<(Vec<YTStreamInfoItemExtractor>, Option<String>)>,
 }
 
-impl YTPlaylistExtractor {
-    pub async fn new<D: Downloader>(
-        playlist_id: &str,
+impl<D: Downloader> YTPlaylistExtractor<D> {
+    pub async fn new(
         downloader: D,
+        playlist_id: &str,
         page_url: Option<String>,
     ) -> Result<Self, ParsingError> {
         if let Some(page_url) = page_url {
-            let initial_data = YTPlaylistExtractor::initial_data(playlist_id, &downloader);
-            let page = YTPlaylistExtractor::page(&page_url, &downloader);
+            let initial_data = YTPlaylistExtractor::initial_data(&downloader, playlist_id);
+            let page = YTPlaylistExtractor::page(&downloader, &page_url);
             use futures::try_join;
             let (initial_data, page) = try_join!(initial_data, page)?;
-            let playlist_info = YTPlaylistExtractor::playlist_info(&initial_data)?;
+            let playlist_info = YTPlaylistExtractor::<D>::playlist_info(&initial_data)?;
 
             Ok(Self {
+                downloader,
                 init_data: initial_data,
                 playlist_info,
                 page: Some(page),
             })
         } else {
-            let initial_data = YTPlaylistExtractor::initial_data(playlist_id, &downloader).await?;
-            let playlist_info = YTPlaylistExtractor::playlist_info(&initial_data)?;
+            let initial_data = YTPlaylistExtractor::initial_data(&downloader, playlist_id).await?;
+            let playlist_info = YTPlaylistExtractor::<D>::playlist_info(&initial_data)?;
             Ok(Self {
+                downloader,
                 init_data: initial_data,
                 playlist_info,
                 page: None,
@@ -42,7 +45,7 @@ impl YTPlaylistExtractor {
         }
     }
 
-    async fn initial_data<D: Downloader>(id: &str, _downloader: &D) -> Result<Value, ParsingError> {
+    async fn initial_data(downloader: &D, id: &str) -> Result<Value, ParsingError> {
         let url = format!("https://www.youtube.com/playlist?list={}&pbj=1", id);
         let mut headers = HashMap::new();
         headers.insert("X-YouTube-Client-Name".to_string(), "1".to_string());
@@ -50,7 +53,7 @@ impl YTPlaylistExtractor {
             "X-YouTube-Client-Version".to_string(),
             HARDCODED_CLIENT_VERSION.to_string(),
         );
-        let response = D::download_with_header(&url, headers).await?;
+        let response = downloader.download_with_header(&url, headers).await?;
         let json_response = serde_json::from_str::<Value>(&response)
             .map_err(|e| ParsingError::from(e.to_string()))?;
         let json_response = json_response
@@ -106,9 +109,9 @@ impl YTPlaylistExtractor {
         ))
     }
 
-    async fn page<D: Downloader>(
+    async fn page(
+        downloader: &D,
         page_url: &str,
-        _downloader: &D,
     ) -> Result<(Vec<YTStreamInfoItemExtractor>, Option<String>), ParsingError> {
         let mut headers = HashMap::new();
         headers.insert("X-YouTube-Client-Name".to_string(), "1".to_string());
@@ -116,7 +119,7 @@ impl YTPlaylistExtractor {
             "X-YouTube-Client-Version".to_string(),
             HARDCODED_CLIENT_VERSION.to_string(),
         );
-        let response = D::download_with_header(&page_url, headers).await?;
+        let response = downloader.download_with_header(&page_url, headers).await?;
         let json_response = serde_json::from_str::<Value>(&response)
             .map_err(|e| ParsingError::from(e.to_string()))?;
 
@@ -129,12 +132,12 @@ impl YTPlaylistExtractor {
         })()
         .ok_or("Cant get continuation")?;
 
-        let items = YTPlaylistExtractor::collect_streams_from(
+        let items = YTPlaylistExtractor::<D>::collect_streams_from(
             section_list_continuation
                 .get("contents")
                 .ok_or("items not in continuation")?,
         )?;
-        let next_url = YTPlaylistExtractor::next_page_url_from(
+        let next_url = YTPlaylistExtractor::<D>::next_page_url_from(
             section_list_continuation
                 .get("continuations")
                 .unwrap_or(&Value::Null),
@@ -144,7 +147,7 @@ impl YTPlaylistExtractor {
     }
 }
 
-impl YTPlaylistExtractor {
+impl<D: Downloader> YTPlaylistExtractor<D> {
     pub fn name(&self) -> Result<String, ParsingError> {
         if let Some(title) = self.playlist_info.get("title") {
             let name = text_from_object(title, false)?;
@@ -281,7 +284,7 @@ impl YTPlaylistExtractor {
                 .get("contents")
         })()
         .ok_or("Cant get videos")?;
-        YTPlaylistExtractor::collect_streams_from(videos)
+        YTPlaylistExtractor::<D>::collect_streams_from(videos)
     }
 
     pub fn next_page_url(&self) -> Result<Option<String>, ParsingError> {
@@ -306,7 +309,7 @@ impl YTPlaylistExtractor {
                     .get("continuations")
             })();
             if let Some(conti) = conti {
-                Ok(YTPlaylistExtractor::next_page_url_from(conti))
+                Ok(YTPlaylistExtractor::<D>::next_page_url_from(conti))
             } else {
                 println!("Continuation is None");
                 Ok(None)

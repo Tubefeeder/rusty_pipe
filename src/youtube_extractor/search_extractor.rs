@@ -19,15 +19,17 @@ pub enum YTSearchItem {
 }
 
 #[derive(Clone, PartialEq)]
-pub struct YTSearchExtractor {
+pub struct YTSearchExtractor<D> {
+    downloader: D,
     initial_data: Map<String, Value>,
     query: String,
     page: Option<(Vec<YTSearchItem>, Option<String>)>,
     p_url: Option<String>,
 }
 
-impl YTSearchExtractor {
-    async fn initial_data<D: Downloader>(
+impl<D: Downloader> YTSearchExtractor<D> {
+    async fn initial_data(
+        downloader: &D,
         url: &str,
         page_count: &str,
     ) -> Result<Map<String, Value>, ParsingError> {
@@ -38,7 +40,7 @@ impl YTSearchExtractor {
             "X-YouTube-Client-Version".to_string(),
             HARDCODED_CLIENT_VERSION.to_string(),
         );
-        let resp = D::download_with_header(&url, headers).await?;
+        let resp = downloader.download_with_header(&url, headers).await?;
         let resp_json = serde_json::from_str::<Value>(&resp)
             .map_err(|er| ParsingError::parsing_error_from_str(&er.to_string()))?;
         let resp_json = resp_json
@@ -89,28 +91,32 @@ impl YTSearchExtractor {
     }
 }
 
-impl YTSearchExtractor {
-    pub async fn new<D: Downloader>(
+impl<D: Downloader> YTSearchExtractor<D> {
+    pub async fn new(
+        downloader: D,
         query: &str,
         page_url: Option<String>,
-    ) -> Result<YTSearchExtractor, ParsingError> {
+    ) -> Result<YTSearchExtractor<D>, ParsingError> {
         let url = format!(
             "https://www.youtube.com/results?disable_polymer=1&search_query={}",
             query
         );
         let query = utf8_percent_encode(query, FRAGMENT).to_string();
         if let Some(page_url) = page_url {
-            let initial_data = YTSearchExtractor::initial_data::<D>(&url, &page_url).await?;
+            let initial_data =
+                YTSearchExtractor::<D>::initial_data(&downloader, &url, &page_url).await?;
 
             Ok(YTSearchExtractor {
+                downloader,
                 initial_data,
                 query,
                 page: None,
                 p_url: Some(page_url),
             })
         } else {
-            let initial_data = YTSearchExtractor::initial_data::<D>(&url, "1").await?;
+            let initial_data = YTSearchExtractor::<D>::initial_data(&downloader, &url, "1").await?;
             Ok(YTSearchExtractor {
+                downloader,
                 initial_data,
                 query,
                 page: None,
@@ -119,7 +125,8 @@ impl YTSearchExtractor {
         }
     }
 
-    pub async fn search_suggestion<D: Downloader>(
+    pub async fn search_suggestion(
+        downloader: &D,
         query: &str,
     ) -> Result<Vec<String>, ParsingError> {
         let mut suggestions = vec![];
@@ -131,7 +138,7 @@ impl YTSearchExtractor {
             &q={}",
             query
         );
-        let resp = D::download(&url).await?;
+        let resp = downloader.download(&url).await?;
         let resp = resp[3..resp.len() - 1].to_string();
         let json =
             serde_json::from_str::<Value>(&resp).map_err(|e| ParsingError::from(e.to_string()))?;
@@ -175,7 +182,9 @@ impl YTSearchExtractor {
             })()
             .ok_or("cant get section");
             if let Ok(item_section) = item_section {
-                search_items.append(&mut YTSearchExtractor::collect_streams_from(&item_section)?)
+                search_items.append(&mut YTSearchExtractor::<D>::collect_streams_from(
+                    &item_section,
+                )?)
             }
         }
         return Ok(search_items);
