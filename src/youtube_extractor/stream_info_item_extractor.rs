@@ -265,6 +265,15 @@ impl YTStreamInfoItemExtractor {
         Ok(pt.ok_or("Cant get upload date")?)
     }
 
+    pub fn upload_date(&self) -> Result<chrono::NaiveDateTime, ParsingError> {
+        let text = self.textual_upload_date()?;
+        let duration_ago =
+            parse_duration::parse(&text).map_err(|_| ParsingError::from("Parsing date"))?;
+        return Ok(
+            chrono::Local::now().naive_local() - chrono::Duration::from_std(duration_ago).unwrap()
+        );
+    }
+
     pub fn textual_view_count(&self) -> Result<String, ParsingError> {
         if self.is_premium_video()? || self.video_info.contains_key("topStandaloneBadge") {
             return Ok("".to_string());

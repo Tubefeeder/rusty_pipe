@@ -20,6 +20,7 @@ impl Downloader for DownloaderExample {
         let resp = self
             .0
             .get(url)
+            .header("Accept-Language", "en")
             .send()
             .await
             .map_err(|er| ParsingError::DownloadError {
@@ -49,7 +50,7 @@ impl Downloader for DownloaderExample {
                 header.1.parse().unwrap(),
             );
         }
-        let res = res.headers(headers);
+        let res = res.headers(headers).header("Accept-Language", "en");
         let res = res.send().await.map_err(|er| er.to_string())?;
         let body = res.text().await.map_err(|er| er.to_string())?;
         Ok(String::from(body))
@@ -72,6 +73,7 @@ fn print_videos(videos: Vec<YTStreamInfoItemExtractor>) {
         count += 1;
         println!("STREAM {}", count);
         println!("title: {:#?}", vid.name());
+        println!("Approx uploaded: {:#?}", vid.upload_date());
     }
 }
 
