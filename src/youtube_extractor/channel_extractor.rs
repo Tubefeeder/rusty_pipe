@@ -30,6 +30,7 @@ impl<D: Downloader> YTChannelExtractor<D> {
                 "X-YouTube-Client-Version".to_string(),
                 HARDCODED_CLIENT_VERSION.to_string(),
             );
+            headers.insert("Accept-Language".to_string(), "en".to_string());
             let response = downloader.download_with_header(&url, headers).await?;
             let json_response = serde_json::from_str::<Value>(&response)
                 .map_err(|e| ParsingError::from(e.to_string()))?;
